@@ -8,7 +8,10 @@ BeforeAll {
     $script = Join-Path (Split-Path -Parent $PSScriptRoot) 'WinForge.ps1'
     $state = Join-Path $TestDrive 'state'
     function Invoke-WfCli {
-        $out = & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script @args -StateRoot $state 2>&1 | Out-String
+        # The child's stderr is expected output here; with a caller's 'Stop' preference
+        # (as in packaging/check.ps1) Windows PowerShell would turn it into an exception.
+        $ErrorActionPreference = 'Continue'
+        $out =& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script @args -StateRoot $state 2>&1 | Out-String
         [pscustomobject]@{ Exit = $LASTEXITCODE; Out = $out }
     }
 }

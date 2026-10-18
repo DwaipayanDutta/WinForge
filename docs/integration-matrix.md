@@ -6,7 +6,7 @@
 | Catalog validation (data only, no code paths) | `Core/Catalog.ps1` | implemented | `Catalog.Tests.ps1` |
 | Registry / service / task / feature adapters | `Adapters/*` | implemented | `Rollback.Tests.ps1` (mocked) |
 | Appx removal | `Adapters/Appx.ps1` | current user only; undo is manual reinstall | none on a real image |
-| Tweak catalog | `Catalog/tweaks.json` | 44 tweaks; Win11DebloatMinimal migration incomplete | validated in CI |
+| Tweak catalog | `Catalog/tweaks.json` | 45 tweaks; Win11DebloatMinimal migration incomplete | validated in CI |
 | Profiles | `Catalog/profiles.json` | Minimal / Recommended / Aggressive, no Danger tweaks | `Authorization.Tests.ps1` |
 | Installer | `Modules/Installer.ps1` | winget + optional choco, dry run by default | `Installer.Tests.ps1` (mocked providers) |
 | Monitor | `Modules/Monitor.ps1` | snapshot + compare; no host classification yet | none |
