@@ -1,0 +1,6 @@
+# WinForge is Windows-only: keep every text file CRLF in the working tree and in the
+# repository so checkouts never rewrite line endings. cmd.exe requires CRLF in .bat files.
+* text=auto eol=crlf
+*.png binary
+*.ico binary
+*.zip binary

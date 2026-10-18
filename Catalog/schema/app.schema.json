@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WinForge app entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["Id","Name","Category","Providers"],
+  "properties": {
+    "Id":       { "type": "string" },
+    "Name":     { "type": "string" },
+    "Category": { "enum": ["Utility","Dev","Browser","Media","Gaming","Security","Office"] },
+    "Providers": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "winget": { "type": ["string","null"] }, "choco": { "type": ["string","null"] } }
+    },
+    "Notes": { "type": "string" }
+  }
+}

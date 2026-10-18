@@ -1,0 +1,29 @@
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      # WinForge targets Windows PowerShell 5.1, so the checks run there (shell: powershell),
+      # not only in PowerShell 7.
+      - name: Install test tools
+        shell: powershell
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+          Install-Module Pester -RequiredVersion 5.6.1 -Force -Scope CurrentUser -SkipPublisherCheck
+          Install-Module PSScriptAnalyzer -RequiredVersion 1.22.0 -Force -Scope CurrentUser
+      - name: Analyzer, catalog validation and Pester
+        shell: powershell
+        run: ./packaging/check.ps1
+      - name: Package
+        shell: powershell
+        run: ./packaging/build.ps1 -Version 0.0.0-ci
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: winforge-ci
+          path: dist/

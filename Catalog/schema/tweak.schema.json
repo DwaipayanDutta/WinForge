@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WinForge tweak",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["Id","Name","Description","Category","Risk","Reversible","Targets","NeedsRestart","Verification","Undo"],
+  "properties": {
+    "Id":          { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$" },
+    "Name":        { "type": "string", "minLength": 3 },
+    "Description": { "type": "string", "minLength": 10 },
+    "Category":    { "enum": ["Debloat","Privacy","Security","System","Taskbar","Start","Explorer"] },
+    "Risk":        { "enum": ["Safe","Caution","Danger"] },
+    "Reversible":  { "enum": ["full","partial","none"] },
+    "MinBuild":    { "type": "integer", "minimum": 10240 },
+    "MaxBuild":    { "type": ["integer","null"] },
+    "Editions":    { "type": "array", "items": { "enum": ["Home","Pro","Enterprise","Education"] } },
+    "Architecture":{ "type": "array", "items": { "enum": ["x64","ARM64"] } },
+    "NeedsRestart":{ "type": "boolean" },
+    "SourceUrl":   { "type": "string", "format": "uri", "pattern": "^https://" },
+    "Notes":       { "type": "string" },
+    "Targets": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["Type","Name"],
+        "properties": {
+          "Type": { "enum": ["Registry","Service","ScheduledTask","OptionalFeature","Appx"] },
+          "Hive": { "enum": ["HKLM","HKCU"] },
+          "Path": { "type": "string" },
+          "Name": { "type": "string" },
+          "Kind": { "enum": ["DWord","QWord","String","ExpandString","Binary","MultiString"] },
+          "Value": {}
+        }
+      }
+    },
+    "Verification": {
+      "type": "object", "additionalProperties": false, "required": ["Type"],
+      "properties": { "Type": { "enum": ["RegistryEquals","ServiceStartTypeEquals","TaskStateEquals","FeatureStateEquals","AppxAbsent"] } }
+    },
+    "Undo": {
+      "type": "object", "additionalProperties": false, "required": ["Strategy"],
+      "properties": { "Strategy": { "enum": ["RestoreCapturedState","ReinstallAppx","Manual","None"] } }
+    }
+  }
+}

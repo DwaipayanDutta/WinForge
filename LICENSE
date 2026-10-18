@@ -1,0 +1,5 @@
+TODO: choose and insert a licence before the first public release.
+
+The scaffold does not pick one for you. MIT and Apache-2.0 are the common choices for
+a tool of this kind; if any code is adapted from another project, check that project's
+terms and record attribution in the README before choosing.

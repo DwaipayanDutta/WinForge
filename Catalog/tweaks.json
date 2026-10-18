@@ -1,0 +1,378 @@
+{
+  "version": 2,
+  "tweaks": [
+    {
+      "Id": "privacy-disable-advertising-id", "Name": "Disable advertising ID",
+      "Description": "Stops apps using the advertising identifier for cross-app personalisation.",
+      "Category": "Privacy", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/privacy/manage-connections-from-windows-operating-system-components-to-microsoft-services",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo", "Name": "Enabled", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-tailored-experiences", "Name": "Disable tailored experiences",
+      "Description": "Stops Windows using diagnostic data to personalise tips and suggestions.",
+      "Category": "Privacy", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/privacy/configure-windows-diagnostic-data-in-your-organization",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\Privacy", "Name": "TailoredExperiencesWithDiagnosticDataEnabled", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-app-launch-tracking", "Name": "Disable app launch tracking",
+      "Description": "Stops Windows tracking app launches to improve Start and search results.",
+      "Category": "Privacy", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/privacy/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "Name": "Start_TrackProgs", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-telemetry-policy-minimum", "Name": "Set telemetry policy to minimum",
+      "Description": "Sets AllowTelemetry to 0 via policy. On Home and Pro Windows treats 0 as Required (1); the UI must say so.",
+      "Category": "Privacy", "Risk": "Caution", "Reversible": "full", "NeedsRestart": false,
+      "Editions": ["Pro","Enterprise","Education"],
+      "Notes": "Pro treats AllowTelemetry 0 as Required (1). Only Enterprise and Education honour 0.",
+      "SourceUrl": "https://learn.microsoft.com/windows/privacy/configure-windows-diagnostic-data-in-your-organization",
+      "Targets": [{ "Type": "Registry", "Hive": "HKLM", "Path": "SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection", "Name": "AllowTelemetry", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-windows-consumer-features", "Name": "Disable Windows consumer features",
+      "Description": "Stops Windows auto-installing suggested apps and showing consumer content.",
+      "Category": "Debloat", "Risk": "Caution", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKLM", "Path": "SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent", "Name": "DisableWindowsConsumerFeatures", "Kind": "DWord", "Value": 1 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-soft-landing", "Name": "Disable Windows welcome suggestions",
+      "Description": "Stops the post-update soft landing suggestion screen.",
+      "Category": "Debloat", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKLM", "Path": "SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent", "Name": "DisableSoftLanding", "Kind": "DWord", "Value": 1 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-spotlight", "Name": "Disable Windows Spotlight features",
+      "Description": "Disables Spotlight tips and suggestions on the lock screen and elsewhere.",
+      "Category": "Debloat", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKLM", "Path": "SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent", "Name": "DisableWindowsSpotlightFeatures", "Kind": "DWord", "Value": 1 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-suggestions-start", "Name": "Disable Start menu suggestions",
+      "Description": "Stops occasional suggestions appearing in the Start menu.",
+      "Category": "Start", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "Name": "SubscribedContent-338388Enabled", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-tips-notifications", "Name": "Disable tips and notifications suggestions",
+      "Description": "Stops Windows showing tips, tricks and suggestions as notifications.",
+      "Category": "Privacy", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "Name": "SubscribedContent-338389Enabled", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-lockscreen-overlay", "Name": "Disable lock screen fun facts",
+      "Description": "Removes the Did you know overlay from the lock screen.",
+      "Category": "Privacy", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager", "Name": "RotatingLockScreenOverlayEnabled", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-bing-search", "Name": "Disable Bing web results in Start",
+      "Description": "Stops Start search returning Bing web results.",
+      "Category": "Start", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\Search", "Name": "BingSearchEnabled", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-cortana-policy", "Name": "Disable Cortana via policy",
+      "Description": "Blocks Cortana using the documented AllowCortana policy.",
+      "Category": "Privacy", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKLM", "Path": "SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search", "Name": "AllowCortana", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-copilot", "Name": "Disable Windows Copilot",
+      "Description": "Turns off Copilot using the documented TurnOffWindowsCopilot policy.",
+      "Category": "Privacy", "Risk": "Caution", "Reversible": "full", "NeedsRestart": false,
+      "MinBuild": 22621,
+      "SourceUrl": "https://learn.microsoft.com/windows/client-management/manage-windows-copilot",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Policies\\Microsoft\\Windows\\WindowsCopilot", "Name": "TurnOffWindowsCopilot", "Kind": "DWord", "Value": 1 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-recall", "Name": "Disable Windows Recall",
+      "Description": "Disables Recall AI data analysis via the documented WindowsAI policy.",
+      "Category": "Privacy", "Risk": "Caution", "Reversible": "full", "NeedsRestart": true,
+      "MinBuild": 26100,
+      "SourceUrl": "https://learn.microsoft.com/windows/client-management/manage-recall",
+      "Targets": [{ "Type": "Registry", "Hive": "HKLM", "Path": "SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsAI", "Name": "DisableAIDataAnalysis", "Kind": "DWord", "Value": 1 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "privacy-disable-error-reporting", "Name": "Disable Windows Error Reporting",
+      "Description": "Turns off Windows Error Reporting and its QueueReporting task.",
+      "Category": "Privacy", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/win32/wer/wer-settings",
+      "Targets": [
+        { "Type": "Registry", "Hive": "HKLM", "Path": "SOFTWARE\\Microsoft\\Windows\\Windows Error Reporting", "Name": "Disabled", "Kind": "DWord", "Value": 1 },
+        { "Type": "ScheduledTask", "Path": "\\Microsoft\\Windows\\Windows Error Reporting\\", "Name": "QueueReporting", "Value": "Disabled" }
+      ],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "debloat-disable-compat-appraiser-task", "Name": "Disable Compatibility Appraiser task",
+      "Description": "Disables the Application Experience compatibility appraiser scheduled task.",
+      "Category": "Debloat", "Risk": "Caution", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/optimize-windows-10-update-delivery",
+      "Targets": [{ "Type": "ScheduledTask", "Path": "\\Microsoft\\Windows\\Application Experience\\", "Name": "Microsoft Compatibility Appraiser", "Value": "Disabled" }],
+      "Verification": { "Type": "TaskStateEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "debloat-disable-device-census-task", "Name": "Disable Device Census task",
+      "Description": "Disables the Device Census telemetry task.",
+      "Category": "Debloat", "Risk": "Caution", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "ScheduledTask", "Path": "\\Microsoft\\Windows\\Device Information\\", "Name": "Device", "Value": "Disabled" }],
+      "Verification": { "Type": "TaskStateEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "debloat-disable-feedback-task", "Name": "Disable Feedback Siuf task",
+      "Description": "Disables the Feedback Siuf scheduled task.",
+      "Category": "Debloat", "Risk": "Caution", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "ScheduledTask", "Path": "\\Microsoft\\Windows\\Feedback\\Siuf\\", "Name": "DmClient", "Value": "Disabled" }],
+      "Verification": { "Type": "TaskStateEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "debloat-disable-diagtrack-service", "Name": "Disable DiagTrack service",
+      "Description": "Sets the Connected User Experiences and Telemetry service to Disabled.",
+      "Category": "Debloat", "Risk": "Caution", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows/privacy/configure-windows-diagnostic-data-in-your-organization",
+      "Targets": [{ "Type": "Service", "Name": "DiagTrack", "Value": "Disabled" }],
+      "Verification": { "Type": "ServiceStartTypeEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "debloat-disable-dmwappushservice", "Name": "Disable dmwappushservice",
+      "Description": "Disables the WAP Push Message Routing service.",
+      "Category": "Debloat", "Risk": "Caution", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows/privacy/",
+      "Targets": [{ "Type": "Service", "Name": "dmwappushservice", "Value": "Disabled" }],
+      "Verification": { "Type": "ServiceStartTypeEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "taskbar-align-left", "Name": "Align taskbar to the left",
+      "Description": "Moves taskbar icons to the left (Windows 11).",
+      "Category": "Taskbar", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "MinBuild": 22000,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "Name": "TaskbarAl", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "taskbar-hide-widgets", "Name": "Hide Widgets button",
+      "Description": "Removes the Widgets button from the taskbar.",
+      "Category": "Taskbar", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "MinBuild": 22000,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "Name": "TaskbarDa", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "taskbar-hide-chat", "Name": "Hide Chat button",
+      "Description": "Removes the Chat (Teams) button from the taskbar.",
+      "Category": "Taskbar", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "MinBuild": 22000,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "Name": "TaskbarMn", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "taskbar-hide-task-view", "Name": "Hide Task View button",
+      "Description": "Removes the Task View button from the taskbar.",
+      "Category": "Taskbar", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "Name": "ShowTaskViewButton", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "explorer-show-file-extensions", "Name": "Show file extensions",
+      "Description": "Makes Explorer show known file extensions.",
+      "Category": "Explorer", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "Name": "HideFileExt", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "explorer-open-this-pc", "Name": "Open File Explorer to This PC",
+      "Description": "Changes Explorer's default launch folder to This PC.",
+      "Category": "Explorer", "Risk": "Safe", "Reversible": "full", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced", "Name": "LaunchTo", "Kind": "DWord", "Value": 1 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "explorer-disable-animations", "Name": "Disable window animations",
+      "Description": "Turns off window minimise/maximise animations.",
+      "Category": "System", "Risk": "Safe", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKCU", "Path": "Control Panel\\Desktop\\WindowMetrics", "Name": "MinAnimate", "Kind": "String", "Value": "0" }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "system-disable-game-dvr", "Name": "Disable Game DVR",
+      "Description": "Turns off background game recording.",
+      "Category": "System", "Risk": "Safe", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [
+        { "Type": "Registry", "Hive": "HKCU", "Path": "System\\GameConfigStore", "Name": "GameDVR_Enabled", "Kind": "DWord", "Value": 0 },
+        { "Type": "Registry", "Hive": "HKLM", "Path": "SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR", "Name": "AllowGameDVR", "Kind": "DWord", "Value": 0 }
+      ],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "system-disable-remote-registry", "Name": "Disable Remote Registry service",
+      "Description": "Sets the Remote Registry service to Disabled.",
+      "Category": "System", "Risk": "Caution", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Service", "Name": "RemoteRegistry", "Value": "Disabled" }],
+      "Verification": { "Type": "ServiceStartTypeEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "system-disable-fax-service", "Name": "Disable Fax service",
+      "Description": "Sets the Fax service to Disabled.",
+      "Category": "System", "Risk": "Caution", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Service", "Name": "Fax", "Value": "Disabled" }],
+      "Verification": { "Type": "ServiceStartTypeEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "system-disable-retail-demo", "Name": "Disable Retail Demo service",
+      "Description": "Sets the Retail Demo service to Disabled.",
+      "Category": "System", "Risk": "Safe", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Service", "Name": "RetailDemo", "Value": "Disabled" }],
+      "Verification": { "Type": "ServiceStartTypeEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "debloat-remove-cortana-appx", "Name": "Remove Cortana app",
+      "Description": "Removes the Cortana Appx package for the current user.",
+      "Category": "Debloat", "Risk": "Caution", "Reversible": "partial", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Appx", "Name": "Microsoft.549981C3F5F10" }],
+      "Verification": { "Type": "AppxAbsent" }, "Undo": { "Strategy": "ReinstallAppx" }
+    },
+    {
+      "Id": "debloat-remove-bing-news", "Name": "Remove Bing News app",
+      "Description": "Removes the Microsoft News Appx package.",
+      "Category": "Debloat", "Risk": "Safe", "Reversible": "partial", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Appx", "Name": "Microsoft.BingNews" }],
+      "Verification": { "Type": "AppxAbsent" }, "Undo": { "Strategy": "ReinstallAppx" }
+    },
+    {
+      "Id": "debloat-remove-bing-weather", "Name": "Remove Bing Weather app",
+      "Description": "Removes the MSN Weather Appx package.",
+      "Category": "Debloat", "Risk": "Safe", "Reversible": "partial", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Appx", "Name": "Microsoft.BingWeather" }],
+      "Verification": { "Type": "AppxAbsent" }, "Undo": { "Strategy": "ReinstallAppx" }
+    },
+    {
+      "Id": "debloat-remove-gethelp", "Name": "Remove Get Help app",
+      "Description": "Removes the Get Help Appx package.",
+      "Category": "Debloat", "Risk": "Safe", "Reversible": "partial", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Appx", "Name": "Microsoft.GetHelp" }],
+      "Verification": { "Type": "AppxAbsent" }, "Undo": { "Strategy": "ReinstallAppx" }
+    },
+    {
+      "Id": "debloat-remove-solitaire", "Name": "Remove Solitaire Collection",
+      "Description": "Removes the Microsoft Solitaire Collection Appx package.",
+      "Category": "Debloat", "Risk": "Safe", "Reversible": "partial", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Appx", "Name": "Microsoft.MicrosoftSolitaireCollection" }],
+      "Verification": { "Type": "AppxAbsent" }, "Undo": { "Strategy": "ReinstallAppx" }
+    },
+    {
+      "Id": "debloat-remove-xbox-gameoverlay", "Name": "Remove Xbox Game Overlay",
+      "Description": "Removes the Xbox Game Overlay Appx package.",
+      "Category": "Debloat", "Risk": "Safe", "Reversible": "partial", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Appx", "Name": "Microsoft.XboxGamingOverlay" }],
+      "Verification": { "Type": "AppxAbsent" }, "Undo": { "Strategy": "ReinstallAppx" }
+    },
+    {
+      "Id": "debloat-remove-feedback-hub", "Name": "Remove Feedback Hub",
+      "Description": "Removes the Windows Feedback Hub Appx package.",
+      "Category": "Debloat", "Risk": "Safe", "Reversible": "partial", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Appx", "Name": "Microsoft.WindowsFeedbackHub" }],
+      "Verification": { "Type": "AppxAbsent" }, "Undo": { "Strategy": "ReinstallAppx" }
+    },
+    {
+      "Id": "debloat-remove-maps", "Name": "Remove Maps app",
+      "Description": "Removes the Windows Maps Appx package.",
+      "Category": "Debloat", "Risk": "Safe", "Reversible": "partial", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Appx", "Name": "Microsoft.WindowsMaps" }],
+      "Verification": { "Type": "AppxAbsent" }, "Undo": { "Strategy": "ReinstallAppx" }
+    },
+    {
+      "Id": "debloat-remove-your-phone", "Name": "Remove Phone Link app",
+      "Description": "Removes the Your Phone (Phone Link) Appx package.",
+      "Category": "Debloat", "Risk": "Safe", "Reversible": "partial", "NeedsRestart": false,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Appx", "Name": "Microsoft.YourPhone" }],
+      "Verification": { "Type": "AppxAbsent" }, "Undo": { "Strategy": "ReinstallAppx" }
+    },
+    {
+      "Id": "feature-disable-powershell-v2", "Name": "Disable PowerShell 2.0 engine",
+      "Description": "Disables the legacy PowerShell 2.0 optional feature (security hardening).",
+      "Category": "Security", "Risk": "Caution", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/powershell/scripting/windows-powershell/install/installing-windows-powershell",
+      "Targets": [{ "Type": "OptionalFeature", "Name": "MicrosoftWindowsPowerShellV2", "Value": "Disabled" }],
+      "Verification": { "Type": "FeatureStateEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "feature-disable-telnet", "Name": "Disable Telnet client",
+      "Description": "Disables the Telnet Client optional feature.",
+      "Category": "Security", "Risk": "Caution", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows-server/administration/windows-commands/telnet",
+      "Targets": [{ "Type": "OptionalFeature", "Name": "TelnetClient", "Value": "Disabled" }],
+      "Verification": { "Type": "FeatureStateEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "feature-disable-print-to-pdf", "Name": "Disable Print to PDF",
+      "Description": "Disables the Microsoft Print to PDF optional feature.",
+      "Category": "System", "Risk": "Caution", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "OptionalFeature", "Name": "Printing-PrintToPDFServices-Features", "Value": "Disabled" }],
+      "Verification": { "Type": "FeatureStateEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "danger-disable-print-spooler", "Name": "Disable Print Spooler service",
+      "Description": "DANGER: stops all printing. Requires Expert mode and typed confirmation.",
+      "Category": "System", "Risk": "Danger", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows/configuration/",
+      "Targets": [{ "Type": "Service", "Name": "Spooler", "Value": "Disabled" }],
+      "Verification": { "Type": "ServiceStartTypeEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    },
+    {
+      "Id": "danger-disable-firewall", "Name": "Disable Windows Firewall (private networks)",
+      "Description": "DANGER: turns off the firewall for the private (standard) network profile only; domain and public profiles are unchanged. Requires Expert mode and typed confirmation.",
+      "Category": "Security", "Risk": "Danger", "Reversible": "full", "NeedsRestart": true,
+      "SourceUrl": "https://learn.microsoft.com/windows/security/operating-system-security/network-security/windows-firewall/",
+      "Targets": [{ "Type": "Registry", "Hive": "HKLM", "Path": "SYSTEM\\CurrentControlSet\\Services\\SharedAccess\\Parameters\\FirewallPolicy\\StandardProfile", "Name": "EnableFirewall", "Kind": "DWord", "Value": 0 }],
+      "Verification": { "Type": "RegistryEquals" }, "Undo": { "Strategy": "RestoreCapturedState" }
+    }
+  ]
+}

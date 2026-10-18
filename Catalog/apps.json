@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "apps": [
+    { "Id": "7zip",      "Name": "7-Zip",              "Category": "Utility", "Providers": { "winget": "7zip.7zip",                  "choco": "7zip" } },
+    { "Id": "vscode",    "Name": "Visual Studio Code",  "Category": "Dev",     "Providers": { "winget": "Microsoft.VisualStudioCode", "choco": "vscode" } },
+    { "Id": "git",       "Name": "Git",                 "Category": "Dev",     "Providers": { "winget": "Git.Git",                  "choco": "git" } },
+    { "Id": "firefox",   "Name": "Firefox",             "Category": "Browser", "Providers": { "winget": "Mozilla.Firefox",          "choco": "firefox" } },
+    { "Id": "powertoys", "Name": "PowerToys",           "Category": "Utility", "Providers": { "winget": "Microsoft.PowerToys",      "choco": "powertoys" } },
+    { "Id": "steam",     "Name": "Steam",               "Category": "Gaming",  "Providers": { "winget": "Valve.Steam",              "choco": "steam" } },
+    { "Id": "vlc",       "Name": "VLC",                 "Category": "Media",   "Providers": { "winget": "VideoLAN.VLC",             "choco": "vlc" } },
+    { "Id": "notepadpp", "Name": "Notepad++",           "Category": "Dev",     "Providers": { "winget": "Notepad++.Notepad++",      "choco": "notepadplusplus" } },
+    { "Id": "chrome",    "Name": "Google Chrome",       "Category": "Browser", "Providers": { "winget": "Google.Chrome",            "choco": "googlechrome" } },
+    { "Id": "python",    "Name": "Python 3",            "Category": "Dev",     "Providers": { "winget": "Python.Python.3.12",       "choco": "python" } },
+    { "Id": "nodejs",    "Name": "Node.js LTS",         "Category": "Dev",     "Providers": { "winget": "OpenJS.NodeJS.LTS",        "choco": "nodejs-lts" } },
+    { "Id": "docker",    "Name": "Docker Desktop",      "Category": "Dev",     "Providers": { "winget": "Docker.DockerDesktop",     "choco": "docker-desktop" } },
+    { "Id": "obs",       "Name": "OBS Studio",          "Category": "Media",   "Providers": { "winget": "OBSProject.OBSStudio",     "choco": "obs-studio" } },
+    { "Id": "discord",   "Name": "Discord",             "Category": "Utility", "Providers": { "winget": "Discord.Discord",          "choco": "discord" } },
+    { "Id": "spotify",   "Name": "Spotify",             "Category": "Media",   "Providers": { "winget": "Spotify.Spotify",          "choco": "spotify" } },
+    { "Id": "brave",     "Name": "Brave",               "Category": "Browser", "Providers": { "winget": "Brave.Brave",              "choco": "brave" } },
+    { "Id": "everything", "Name": "Everything",          "Category": "Utility", "Providers": { "winget": "voidtools.Everything",     "choco": "everything" } },
+    { "Id": "winscp",    "Name": "WinSCP",              "Category": "Utility", "Providers": { "winget": "WinSCP.WinSCP",            "choco": "winscp" } },
+    { "Id": "putty",     "Name": "PuTTY",               "Category": "Dev",     "Providers": { "winget": "PuTTY.PuTTY",              "choco": "putty" } },
+    { "Id": "teracopy",  "Name": "TeraCopy",            "Category": "Utility", "Providers": { "winget": "CodeSector.TeraCopy",      "choco": "teracopy" } }
+  ]
+}

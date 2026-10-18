@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "bundles": [
+    { "Id": "Essentials", "Name": "Essentials", "DefaultSelected": true,  "Apps": ["7zip","firefox","vlc"] },
+    { "Id": "Dev",        "Name": "Dev",        "DefaultSelected": false, "Apps": ["vscode","git","powertoys","notepadpp","python","nodejs","putty"] },
+    { "Id": "Gaming",     "Name": "Gaming",     "DefaultSelected": false, "Apps": ["steam","discord","obs"] },
+    { "Id": "Security",   "Name": "Security (opt-in)", "DefaultSelected": false, "Apps": [],
+      "Notes": "Unchecked by default. Third-party real-time AV usually switches Defender off." }
+  ]
+}

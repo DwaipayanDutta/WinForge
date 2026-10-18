@@ -1,0 +1,54 @@
+{
+  "version": 2,
+  "profiles": [
+    {
+      "Id": "Minimal", "Name": "Minimal",
+      "Description": "Privacy-safe tweaks only. No services, no app removal, no reboot.",
+      "TweakIds": [
+        "privacy-disable-advertising-id", "privacy-disable-tailored-experiences",
+        "privacy-disable-app-launch-tracking", "privacy-disable-suggestions-start",
+        "privacy-disable-tips-notifications", "privacy-disable-lockscreen-overlay",
+        "privacy-disable-bing-search", "privacy-disable-cortana-policy",
+        "privacy-disable-soft-landing", "privacy-disable-spotlight"
+      ]
+    },
+    {
+      "Id": "Recommended", "Name": "Recommended",
+      "Description": "Minimal plus policy telemetry, consumer features and safe Explorer tweaks.",
+      "TweakIds": [
+        "privacy-disable-advertising-id", "privacy-disable-tailored-experiences",
+        "privacy-disable-app-launch-tracking", "privacy-disable-suggestions-start",
+        "privacy-disable-tips-notifications", "privacy-disable-lockscreen-overlay",
+        "privacy-disable-bing-search", "privacy-disable-cortana-policy",
+        "privacy-disable-soft-landing", "privacy-disable-spotlight",
+        "privacy-telemetry-policy-minimum", "privacy-disable-windows-consumer-features",
+        "privacy-disable-copilot", "explorer-show-file-extensions",
+        "explorer-open-this-pc", "taskbar-align-left"
+      ]
+    },
+    {
+      "Id": "Aggressive", "Name": "Aggressive",
+      "Description": "Recommended plus task/service changes and safe Appx removals. Still no Danger tweaks.",
+      "TweakIds": [
+        "privacy-disable-advertising-id", "privacy-disable-tailored-experiences",
+        "privacy-disable-app-launch-tracking", "privacy-disable-suggestions-start",
+        "privacy-disable-tips-notifications", "privacy-disable-lockscreen-overlay",
+        "privacy-disable-bing-search", "privacy-disable-cortana-policy",
+        "privacy-disable-soft-landing", "privacy-disable-spotlight",
+        "privacy-telemetry-policy-minimum", "privacy-disable-windows-consumer-features",
+        "privacy-disable-copilot", "privacy-disable-recall",
+        "privacy-disable-error-reporting", "debloat-disable-compat-appraiser-task",
+        "debloat-disable-device-census-task", "debloat-disable-feedback-task",
+        "debloat-disable-diagtrack-service", "debloat-disable-dmwappushservice",
+        "explorer-show-file-extensions", "explorer-open-this-pc",
+        "taskbar-align-left", "taskbar-hide-widgets", "taskbar-hide-chat",
+        "system-disable-game-dvr", "system-disable-remote-registry",
+        "system-disable-retail-demo",
+        "debloat-remove-bing-news", "debloat-remove-bing-weather",
+        "debloat-remove-gethelp", "debloat-remove-solitaire",
+        "debloat-remove-xbox-gameoverlay", "debloat-remove-feedback-hub",
+        "debloat-remove-maps", "debloat-remove-your-phone"
+      ]
+    }
+  ]
+}
