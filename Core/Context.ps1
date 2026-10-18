@@ -59,6 +59,9 @@ function New-WinForgeContext {
         IsPortable  = ($StateRoot -eq $portableState)
         Elevated    = $elevated
         StateWritable = $true
+        # True only for the default %ProgramData% folder after it has been locked down;
+        # Undo trusts recorded targets without a catalog match only in that case.
+        StateProtected = $false
     }
 
     if ($isDefault -and -not $elevated) {
@@ -71,6 +74,6 @@ function New-WinForgeContext {
     foreach ($d in @($ctx.StateRoot, $ctx.LogDir, $ctx.RunDir, $ctx.BackupDir)) {
         if (-not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
     }
-    if ($isDefault -and $elevated) { Protect-WinForgeStateRoot -Path $ctx.StateRoot }
+    if ($isDefault -and $elevated) { Protect-WinForgeStateRoot -Path $ctx.StateRoot; $ctx.StateProtected = $true }
     return $ctx
 }

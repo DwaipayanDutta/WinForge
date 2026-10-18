@@ -57,7 +57,11 @@ function Invoke-WinForgeUpdateCheck {
         return [pscustomobject]@{ Current = $Context.Version; Latest = $rel.Tag; UpdateAvailable = $newer; Zip = $zip.Name; Verified = $false }
     }
 
-    if (-not $OutDir) { $OutDir = Join-Path $Context.StateRoot 'updates' }
+    if (-not $OutDir) {
+        # A non-elevated process cannot write the protected %ProgramData% state folder;
+        # downloads are inert files, so they go to the user's own profile instead.
+        $OutDir = if ($Context.StateWritable) { Join-Path $Context.StateRoot 'updates' } else { Join-Path $env:LOCALAPPDATA 'WinForge\updates' }
+    }
     New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
     $zipPath = Join-Path $OutDir $zip.Name
     $sumPath = Join-Path $OutDir $sums.Name

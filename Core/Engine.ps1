@@ -121,55 +121,136 @@ function Invoke-WinForgeOperation {
     return $results
 }
 
-function Invoke-WinForgeUndo {
-    param($Context, [string] $RunId, [string[]] $TweakId)
-    if (-not $Context.Elevated) { throw 'Administrator privileges are required to undo changes.' }
-    Assert-WinForgeCatalog -Context $Context
-    $record  = Get-RunRecord -Context $Context -RunId $RunId
-    $catalog = Get-WinForgeCatalog -Context $Context
-    $results = @()
+function Get-WinForgeUndoPlan {
+    # Decides, per recorded tweak, whether and how it can be restored, and pairs the live
+    # state with the state that would be restored. Reads only.
+    #
+    # Target source: when the catalog is valid and still defines the tweak, the recorded
+    # targets must match it (protects against tampered records and catalog drift). When
+    # the catalog is broken or the tweak was removed, the recorded targets are used, but
+    # only from a protected state folder (or with -AllowRecordedTargets) and only after
+    # the same per-target validation the catalog gets. A bad catalog never blocks Undo.
+    param($Context, [string] $RunId, [string[]] $TweakId, [switch] $AllowRecordedTargets)
+
+    $record = Get-RunRecord -Context $Context -RunId $RunId
+    $check = Test-WinForgeCatalog -Context $Context
+    $catalog = if ($check.Valid) { Get-WinForgeCatalog -Context $Context } else { $null }
+    $trustRecord = [bool]$AllowRecordedTargets -or [bool](Get-TweakProperty $Context 'StateProtected')
+    $kinds = @('DWord','QWord','String','ExpandString','MultiString','Binary')
 
     $entries = @($record.Tweaks)
     [array]::Reverse($entries)
+    $plan = @()
     foreach ($entry in $entries) {
         if ($TweakId -and ($TweakId -notcontains $entry.Id)) { continue }
-        if ($entry.Status -notin $script:UndoableStatuses) { continue }
-        $before = @($entry.Before)
-        if (-not $entry.Before) { $results += [pscustomobject]@{ Id = $entry.Id; Status = 'Skipped'; Reason = 'No captured state' }; continue }
+        # Older records overwrote Status with 'Restored'; newer ones keep Status and set UndoStatus.
+        $undone = (Get-TweakProperty $entry 'UndoStatus') -eq 'Restored' -or $entry.Status -eq 'Restored'
+        if ($undone -or $entry.Status -notin $script:UndoableStatuses) { continue }
 
-        $t = Get-WinForgeTweak -Id $entry.Id -Context $Context -Catalog $catalog
-        if (-not $t) { $results += [pscustomobject]@{ Id = $entry.Id; Status = 'Skipped'; Reason = 'Tweak no longer in catalog; restore manually from the run record' }; continue }
-        if ($t.Undo.Strategy -ne 'RestoreCapturedState') {
-            $results += [pscustomobject]@{ Id = $entry.Id; Status = 'NotReversible'; Reason = $t.Undo.Strategy }
+        $item = [pscustomobject]@{ Id = $entry.Id; Action = 'Restore'; Source = 'catalog'; Reason = ''; Targets = @(); Before = @($entry.Before); Current = @() }
+        $recorded = @($entry.After)
+        if (-not $entry.Before -or -not $entry.After) { $item.Action = 'Skip'; $item.Reason = 'No captured state'; $plan += $item; continue }
+
+        $t = if ($catalog) { Get-WinForgeTweak -Id $entry.Id -Catalog $catalog } else { $null }
+        $strategy = Get-TweakProperty $entry 'UndoStrategy'
+        if (-not $strategy -and $t) { $strategy = $t.Undo.Strategy }
+        if (@($recorded | Where-Object { $_.Type -eq 'Appx' }).Count) { $strategy = 'ReinstallAppx' }
+        if ($strategy -and $strategy -ne 'RestoreCapturedState') {
+            $item.Action = 'NotReversible'
+            $item.Reason = if ($strategy -eq 'ReinstallAppx') { 'Removed apps must be reinstalled from the Microsoft Store' } else { "Undo strategy is $strategy" }
+            $plan += $item; continue
+        }
+
+        $errs = New-Object System.Collections.Generic.List[string]
+        foreach ($tg in $recorded) { Test-WinForgeTarget -Target $tg -Owner $entry.Id -Errors $errs }
+        if ($recorded.Count -ne $item.Before.Count) { $errs.Add('target and snapshot counts differ') }
+        for ($i = 0; $i -lt [Math]::Min($recorded.Count, $item.Before.Count); $i++) {
+            if ($recorded[$i].Type -eq 'Registry' -and (Get-TweakProperty $item.Before[$i] 'Existed') -and $kinds -notcontains (Get-TweakProperty $item.Before[$i] 'Kind')) { $errs.Add('snapshot has an invalid registry kind') }
+        }
+        if ($errs.Count) { $item.Action = 'Refuse'; $item.Reason = "Run record failed validation: $($errs -join '; ')"; $plan += $item; continue }
+
+        if ($t) {
+            $targets = @($t.Targets)
+            $same = $targets.Count -eq $recorded.Count
+            for ($i = 0; $same -and $i -lt $targets.Count; $i++) { $same = Test-TargetIdentity $targets[$i] $recorded[$i] }
+            if (-not $same) { $item.Action = 'Refuse'; $item.Reason = 'Run record does not match the catalog targets'; $plan += $item; continue }
+            $item.Targets = $targets
+        } elseif ($trustRecord) {
+            $item.Targets = $recorded; $item.Source = 'run record'
+            $item.Reason = if ($catalog) { 'Tweak no longer in catalog; using the targets recorded at apply time' } else { 'Catalog is invalid; using the targets recorded at apply time' }
+        } else {
+            $item.Action = 'Refuse'
+            $item.Reason = 'Catalog cannot confirm these targets and the state folder is not protected; rerun with -AllowRecordedTargets after checking the run record'
+            $plan += $item; continue
+        }
+        $item.Current = @($item.Targets | ForEach-Object { Get-TargetSnapshot -Target $_ })
+        $plan += $item
+    }
+    return $plan
+}
+
+function Get-WinForgeUndoPlanText {
+    param($Plan)
+    $lines = @()
+    foreach ($p in $Plan) {
+        if ($p.Action -ne 'Restore') { $lines += ("{0,-42} {1}: {2}" -f $p.Id, $p.Action.ToUpper(), $p.Reason); continue }
+        for ($i = 0; $i -lt @($p.Targets).Count; $i++) {
+            $tg = @($p.Targets)[$i]
+            $lines += ("{0,-42} {1} -> restore {2}" -f $p.Id, (Format-TargetSnapshot -Target $tg -Snapshot @($p.Current)[$i]), (Format-TargetSnapshot -Target $tg -Snapshot @($p.Before)[$i]))
+        }
+        if ($p.Source -ne 'catalog') { $lines += ("{0,-42} NOTE: {1}" -f $p.Id, $p.Reason) }
+    }
+    return $lines
+}
+
+function Invoke-WinForgeUndo {
+    param($Context, [string] $RunId, [string[]] $TweakId, [switch] $AllowRecordedTargets, [switch] $Preview)
+    $plan = Get-WinForgeUndoPlan -Context $Context -RunId $RunId -TweakId $TweakId -AllowRecordedTargets:$AllowRecordedTargets
+    if ($Preview) { return $plan }
+    if (-not $Context.Elevated) { throw 'Administrator privileges are required to undo changes.' }
+
+    $record = Get-RunRecord -Context $Context -RunId $RunId
+    $results = @()
+    foreach ($p in $plan) {
+        if ($p.Action -ne 'Restore') {
+            $st = switch ($p.Action) { 'Skip' { 'Skipped' } 'Refuse' { 'Refused' } default { 'NotReversible' } }
+            $results += [pscustomobject]@{ Id = $p.Id; Status = $st; Reason = $p.Reason }
             continue
         }
-
-        # Only restore onto targets the current catalog also defines. A record whose
-        # targets differ (catalog update, or a tampered file) is refused, never trusted.
-        $targets = @($t.Targets); $recorded = @($entry.After)
-        $mismatch = ($targets.Count -ne $recorded.Count) -or ($targets.Count -ne $before.Count)
-        for ($i = 0; -not $mismatch -and $i -lt $targets.Count; $i++) {
-            if (-not (Test-TargetIdentity $targets[$i] $recorded[$i])) { $mismatch = $true }
-            if ($targets[$i].Type -eq 'Registry' -and (Get-TweakProperty $before[$i] 'Existed') -and
-                @('DWord','QWord','String','ExpandString','MultiString','Binary') -notcontains (Get-TweakProperty $before[$i] 'Kind')) { $mismatch = $true }
-        }
-        if ($mismatch) { $results += [pscustomobject]@{ Id = $entry.Id; Status = 'Refused'; Reason = 'Run record does not match the catalog targets' }; continue }
-
+        $entry = @($record.Tweaks | Where-Object { $_.Id -eq $p.Id })[-1]
+        $targets = @($p.Targets); $before = @($p.Before)
+        $status = 'Restored'; $reason = ''
         try {
-            for ($i = $targets.Count - 1; $i -ge 0; $i--) {
-                Restore-TargetSnapshot -Target $targets[$i] -Snapshot $before[$i]
+            for ($i = $targets.Count - 1; $i -ge 0; $i--) { Restore-TargetSnapshot -Target $targets[$i] -Snapshot $before[$i] }
+            # Read back every target: a restore is only reported as done when the live
+            # state matches what was captured before the original change.
+            $diff = @()
+            for ($i = 0; $i -lt $targets.Count; $i++) {
+                $now = Get-TargetSnapshot -Target $targets[$i]
+                if (-not (Test-SnapshotEquals -Target $targets[$i] -Expected $before[$i] -Actual $now)) {
+                    $diff += "$($targets[$i].Name): now $(Format-TargetSnapshot -Target $targets[$i] -Snapshot $now), expected $(Format-TargetSnapshot -Target $targets[$i] -Snapshot $before[$i])"
+                }
             }
-            $entry.Status = 'Restored'
-            $results += [pscustomobject]@{ Id = $entry.Id; Status = 'Restored'; Reason = '' }
-            Write-WinForgeLog -Message "$($entry.Id): restored from run $RunId"
+            if ($diff) { $status = 'RestoreUnverified'; $reason = $diff -join '; ' }
         } catch {
-            $results += [pscustomobject]@{ Id = $entry.Id; Status = 'Failed'; Reason = $_.Exception.Message }
-            Write-WinForgeLog -Level Error -Message "$($entry.Id): undo failed: $($_.Exception.Message)"
+            $status = 'Failed'; $reason = $_.Exception.Message
         }
+        if ($p.Source -ne 'catalog') { $reason = (@($reason, 'source: run record') | Where-Object { $_ }) -join '; ' }
+
+        # The original Status is kept; the undo outcome is recorded alongside it.
+        foreach ($f in 'UndoStatus','UndoUtc','UndoReason') {
+            if (-not $entry.PSObject.Properties[$f]) { $entry | Add-Member -NotePropertyName $f -NotePropertyValue $null }
+        }
+        $entry.UndoStatus = $status; $entry.UndoUtc = [DateTime]::UtcNow.ToString('o'); $entry.UndoReason = $reason
+        $results += [pscustomobject]@{ Id = $p.Id; Status = $status; Reason = $reason }
+        Write-WinForgeLog -Level $(if ($status -eq 'Restored') { 'Info' } else { 'Error' }) -Message "$($p.Id): undo $status $reason (run $RunId)"
     }
 
     if (-not $record.PSObject.Properties['Undo']) { $record | Add-Member -NotePropertyName Undo -NotePropertyValue @() }
-    $record.Undo = @(@($record.Undo) | Where-Object { $_ }) + [pscustomobject]@{ Utc = [DateTime]::UtcNow.ToString('o'); Results = $results }
+    $record.Undo = @(@($record.Undo) | Where-Object { $_ }) + [pscustomobject]@{
+        Utc = [DateTime]::UtcNow.ToString('o'); User = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+        TweakIds = $TweakId; Results = $results
+    }
     Save-RunRecord -Context $Context -Record $record | Out-Null
     return $results
 }

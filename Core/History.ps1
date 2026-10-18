@@ -32,7 +32,7 @@ function Get-WinForgeHistory {
             RunId = $r.RunId; StartedUtc = $r.StartedUtc; Profile = $r.Profile; State = $r.State
             Applied  = @($tw | Where-Object { $_.Status -in @('AppliedVerified','AwaitingRestart') }).Count
             Failed   = @($tw | Where-Object { $_.Status -in @('Failed','Partial','VerifyFailed','RolledBack') }).Count
-            Restored = @($tw | Where-Object { $_.Status -eq 'Restored' }).Count
+            Restored = @($tw | Where-Object { $_.Status -eq 'Restored' -or ($_.PSObject.Properties['UndoStatus'] -and $_.UndoStatus -eq 'Restored') }).Count
         }
     }
     return $out | Sort-Object StartedUtc -Descending

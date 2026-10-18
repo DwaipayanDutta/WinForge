@@ -53,6 +53,7 @@ function New-OperationPlan {
         $plan += [pscustomobject]@{
             Id = $t.Id; Name = $t.Name; Risk = $t.Risk; Supported = $true
             Reason = ''; Notes = (Get-TweakProperty $t 'Notes'); Before = $snapshots; After = $t.Targets
+            Reversible = (Get-TweakProperty $t 'Reversible'); UndoStrategy = (Get-TweakProperty (Get-TweakProperty $t 'Undo') 'Strategy')
         }
     }
     return $plan
@@ -70,6 +71,15 @@ function Get-OperationPlanText {
         }
         if ($p.Risk -eq 'Danger') { $lines += ("{0,-42} DANGER: requires -Expert -TypedConfirmation {0}" -f $p.Id) }
         if ($p.Notes) { $lines += ("{0,-42} NOTE: {1}" -f $p.Id, $p.Notes) }
+        $rev = Get-TweakProperty $p 'Reversible'
+        if ($rev -and $rev -ne 'full') {
+            $how = switch (Get-TweakProperty $p 'UndoStrategy') {
+                'ReinstallAppx' { 'WinForge cannot undo this: reinstall the app from the Microsoft Store (needs a network connection). Removal applies to the current user only; the app stays provisioned for new accounts.' }
+                'Manual'        { 'WinForge cannot undo this automatically; see the tweak description for manual steps.' }
+                default         { 'WinForge cannot undo this.' }
+            }
+            $lines += ("{0,-42} REVERSIBLE: {1}. {2}" -f $p.Id, $rev, $how)
+        }
     }
     return $lines
 }
@@ -77,7 +87,7 @@ function Get-OperationPlanText {
 function Format-OperationPlan {
     param($Plan)
     foreach ($line in (Get-OperationPlanText -Plan $Plan)) {
-        $level = if ($line -match ' SKIP: | DANGER: ') { 'Warn' } else { 'Info' }
+        $level = if ($line -match ' SKIP: | DANGER: | REVERSIBLE: ') { 'Warn' } else { 'Info' }
         Write-WinForgeLog -Level $level -Message $line
     }
 }
