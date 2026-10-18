@@ -397,6 +397,7 @@ function Update-WfSecurity {
         $script:wf.PostureLoaded = $true
         $c.SecurityList.Children.Clear()
         $labels = [ordered]@{
+            Antivirus = @('Antivirus registered with Windows', [char]0xEA18)
             DefenderRealTime = @('Defender real-time protection', [char]0xEA18); DefenderMode = @('Defender running mode', [char]0xEA18)
             TamperProtection = @('Tamper Protection', [char]0xE72E); FirewallProfiles = @('Firewall profiles', [char]0xE968)
             SmartScreenPolicy = @('SmartScreen policy', [char]0xE8A1); SmartScreenSetting = @('SmartScreen setting', [char]0xE8A1)
@@ -413,11 +414,18 @@ function Update-WfSecurity {
             $first = $false
         }
         $c.PrivacyNote.Text = "$($r.Honesty.Edition): $($r.Honesty.PolicyNote)"
+        # Which antivirus is actually protecting the PC: Defender in passive mode with another
+        # product on is healthy, and saying "Defender off" alone would mislead.
         $rt = [string]$r.Posture.DefenderRealTime
-        $c.StatSecurity.Text = switch ($rt) { 'True' { 'Defender on' } 'False' { 'Defender off' } default { 'Unavailable' } }
+        $active = @(([string](Get-TweakProperty $r.Posture 'Antivirus')) -split '; ' | Where-Object { $_ -match '=on$' } | ForEach-Object { $_ -replace '=on$', '' })
+        $other = @($active | Where-Object { $_ -notmatch 'Defender' })
+        $c.StatSecurity.Text = if ($rt -eq 'True') { 'Defender on' } elseif ($other) { "$($other[0]) on" } elseif ($rt -eq 'False') { 'No active AV' } else { 'Unavailable' }
         $fw = [string]$r.Posture.FirewallProfiles
         $on = ([regex]::Matches($fw, '=True')).Count; $all = ([regex]::Matches($fw, '=')).Count
-        $c.StatSecurityHint.Text = if ($all) { "Firewall on for $on of $all profiles $($script:WfDot) read from Windows" } else { 'Firewall state unavailable' }
+        $parts = @()
+        if ($other -and $rt -ne 'True') { $parts += "Defender: $($r.Posture.DefenderMode)" }
+        $parts += if ($all) { "firewall on for $on of $all profiles" } else { 'firewall state unavailable' }
+        $c.StatSecurityHint.Text = ($parts -join " $($script:WfDot) ") + " $($script:WfDot) read from Windows"
     } | Out-Null
 }
 
@@ -843,6 +851,8 @@ function Show-WinForgeWpf {
     $window.Add_PreviewKeyDown({
         if ($args[1].Key -eq 'Escape' -and $script:wf.C.Overlay.Visibility -eq 'Visible') { $args[1].Handled = $true; Invoke-WfUi 'Dialog' { Close-WfDialog } }
     })
+    # The sidebar's footer card only fits on taller windows; hide it rather than clip it.
+    $window.Add_SizeChanged({ $script:wf.C.SideFoot.Visibility = if ($script:wf.Window.ActualHeight -lt 860) { 'Collapsed' } else { 'Visible' } })
     $window.Add_Closing({
         if ($script:wf.BusyJob) {
             $args[1].Cancel = $true

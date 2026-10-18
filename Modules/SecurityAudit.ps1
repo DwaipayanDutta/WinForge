@@ -19,7 +19,20 @@ function Get-WinForgeSecurityPosture {
         $out.TamperProtection = if ($mp.PSObject.Properties['IsTamperProtected']) { $mp.IsTamperProtected } else { 'Unavailable' }
     } catch { $out.DefenderRealTime = 'Unavailable'; $out.DefenderMode = 'Unavailable'; $out.TamperProtection = 'Unavailable' }
 
-    try { $out.FirewallProfiles = ((Get-NetFirewallProfile -ErrorAction Stop) | ForEach-Object { "$($_.Name)=$($_.Enabled)" }) -join '; ' }
+    # Windows Security Center's registered products. productState is a documented-by-
+    # convention bit field: the middle byte 0x10/0x11 means real-time protection is on.
+    try {
+        $products = @(Get-CimInstance -Namespace 'root/SecurityCenter2' -ClassName AntiVirusProduct -ErrorAction Stop)
+        $out.Antivirus = if ($products) {
+            ($products | ForEach-Object {
+                $hex = '{0:X6}' -f [int]$_.productState
+                $state = if ($hex.Substring(2, 2) -in @('10','11')) { 'on' } else { 'off' }
+                "$($_.displayName)=$state"
+            }) -join '; '
+        } else { 'None registered' }
+    } catch { $out.Antivirus = 'Unavailable (Security Center not present on this edition)' }
+
+    try { $out.FirewallProfiles =((Get-NetFirewallProfile -ErrorAction Stop) | ForEach-Object { "$($_.Name)=$($_.Enabled)" }) -join '; ' }
     catch { $out.FirewallProfiles = 'Unavailable' }
 
     $ssPolicy = Get-WinForgeRegistryValueOrNull 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System' 'EnableSmartScreen'
