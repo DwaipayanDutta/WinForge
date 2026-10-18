@@ -36,7 +36,7 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet('Help','ValidateCatalog','Status','Preview','Apply','Undo','History','Dashboard',
-                 'List','Privacy','Monitor','Audit','Install','Deploy','UpdateCheck','Gui','Wizard')]
+                 'List','Privacy','Monitor','Audit','Install','Deploy','UpdateCheck','Gui','GuiClassic','Wizard')]
     [string] $Command = 'Help',
 
     [string[]] $Tweak,
@@ -155,6 +155,16 @@ switch ($Command) {
     }
     'UpdateCheck' { Invoke-WinForgeUpdateCheck -Context $ctx -Download:$Force | Format-List }
     'Gui'       {
+        . (Join-Path $Root 'UI\Background.ps1')
+        . (Join-Path $Root 'UI\WpfApp.ps1')
+        # Usually started by double-click, where a console error may never be seen.
+        try { Show-WinForgeWpf -Context $ctx }
+        catch {
+            [void][System.Windows.MessageBox]::Show("WinForge could not start the GUI:`r`n`r`n$($_.Exception.Message)", 'WinForge')
+            throw
+        }
+    }
+    'GuiClassic' {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing, Microsoft.VisualBasic
         . (Join-Path $Root 'UI\Runspace.ps1')
         . (Join-Path $Root 'UI\MainForm.ps1')
