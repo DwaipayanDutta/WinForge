@@ -74,7 +74,7 @@ function Install-WinForgeApp {
 }
 
 function Install-WinForgeBundle {
-    param($Context, [string] $BundleId, [switch] $DryRun, [switch] $AllowChocoFallback)
+    param($Context, [string] $BundleId, [switch] $DryRun, [switch] $AllowChocoFallback, [switch] $NoRestorePoint)
 
     Assert-WinForgeCatalog -Context $Context
     $providers = Get-WinForgeProviders
@@ -83,6 +83,25 @@ function Install-WinForgeBundle {
     if (-not $bundle) { throw "Bundle '$BundleId' not found." }
 
     $apps = $catalog.apps | Where-Object { $bundle.Apps -contains $_.Id }
+    $record = [pscustomobject]@{
+        InstallId = New-WinForgeRunId; StartedUtc = [DateTime]::UtcNow.ToString('o'); FinishedUtc = $null
+        Bundle = $BundleId; DryRun = [bool]$DryRun; ChocoFallback = [bool]$AllowChocoFallback
+        Providers = $providers; RestorePoint = $null; Results = @()
+    }
+
+    # Installers run arbitrary vendor code, so take a System Restore point first. Best
+    # effort: System Restore is often off, and Windows allows one point per 24 hours.
+    if (-not $DryRun -and -not $NoRestorePoint) {
+        if (-not $Context.Elevated) { $record.RestorePoint = 'Skipped: requires elevation' }
+        else {
+            try {
+                Checkpoint-Computer -Description "WinForge: install bundle $BundleId" -RestorePointType APPLICATION_INSTALL -ErrorAction Stop -WarningAction SilentlyContinue
+                $record.RestorePoint = 'Created'
+            } catch { $record.RestorePoint = "Not created: $($_.Exception.Message)" }
+        }
+        Write-WinForgeLog -Level $(if ($record.RestorePoint -eq 'Created') { 'Info' } else { 'Warn' }) -Message "Restore point: $($record.RestorePoint)"
+    }
+
     $report = @()
     foreach ($a in $apps) {
         $provider = if ($providers.winget -and $a.Providers.winget) { 'winget' } elseif ($providers.choco -and $a.Providers.choco) { 'choco' } else { $null }
@@ -98,5 +117,34 @@ function Install-WinForgeBundle {
         }
         $report += $r
     }
+
+    $record.Results = $report; $record.FinishedUtc = [DateTime]::UtcNow.ToString('o')
+    $dir = Get-WinForgeInstallDir -Context $Context
+    if (-not $DryRun -and $dir) {
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        $record | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $dir "$($record.InstallId).json") -Encoding UTF8
+    }
     return $report
+}
+
+function Get-WinForgeInstallDir {
+    param($Context)
+    if ($Context.StateWritable) { return (Join-Path $Context.StateRoot 'installs') }
+    return (Join-Path $env:LOCALAPPDATA 'WinForge\installs')
+}
+
+function Get-WinForgeInstallHistory {
+    param($Context)
+    $dir = Get-WinForgeInstallDir -Context $Context
+    $out = @()
+    foreach ($f in Get-ChildItem -LiteralPath $dir -Filter '*.json' -ErrorAction SilentlyContinue) {
+        $r = Get-Content -LiteralPath $f.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+        $res = @($r.Results)
+        $out += [pscustomobject]@{
+            InstallId = $r.InstallId; StartedUtc = $r.StartedUtc; Bundle = $r.Bundle; RestorePoint = $r.RestorePoint
+            Installed = @($res | Where-Object { $_.Status -eq 'InstalledVerified' }).Count
+            Failed    = @($res | Where-Object { $_.Status -in @('Failed','InstalledUnverified','NoProvider') }).Count
+        }
+    }
+    return $out | Sort-Object StartedUtc -Descending
 }
