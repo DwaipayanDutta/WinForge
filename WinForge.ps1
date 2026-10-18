@@ -1,4 +1,3 @@
-#Requires -Version 5.1
 <#
 .SYNOPSIS
     WinForge: preview-first Windows debloat, privacy and app-install toolkit.
@@ -31,6 +30,8 @@
 .EXAMPLE
     .\WinForge.ps1 Undo -RunId 20261018T120000Z-1a2b3c
 #>
+# #Requires must come after the help block: placed first, it hides the help from Get-Help.
+#Requires -Version 5.1
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]

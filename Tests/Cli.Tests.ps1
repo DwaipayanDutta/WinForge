@@ -27,6 +27,23 @@ Describe 'Static checks' {
     }
 }
 
+Describe 'Launcher' {
+    BeforeAll { $bat = Join-Path (Split-Path -Parent $PSScriptRoot) 'WinForge.bat' }
+    It 'uses CRLF line endings (cmd.exe misparses LF batch files)' {
+        $raw = [IO.File]::ReadAllText($bat)
+        [regex]::Matches($raw, "(?<!`r)`n").Count | Should -Be 0
+    }
+    It 'opens the GUI when started without arguments (double-click)' {
+        (Get-Content $bat -Raw) | Should -Match 'WinForge\.ps1" Gui'
+    }
+    It 'keeps the elevated window open for CLI commands' {
+        (Get-Content $bat -Raw) | Should -Match "cmd\.exe -ArgumentList \('/k "
+    }
+    It 'shows the script help, not just the syntax line' {
+        (Get-Help (Join-Path (Split-Path -Parent $PSScriptRoot) 'WinForge.ps1')).Synopsis | Should -Match 'preview-first'
+    }
+}
+
 Describe 'CLI (child process)' {
     It 'validates the catalog' {
         $r = Invoke-WfCli ValidateCatalog
