@@ -27,7 +27,7 @@
     },
     {
       "Id": "privacy-telemetry-policy-minimum", "Name": "Set telemetry policy to minimum",
-      "Description": "Sets AllowTelemetry to 0 via policy. On Home and Pro Windows treats 0 as Required (1); the UI must say so.",
+      "Description": "Sets the AllowTelemetry policy to 0 (Security). Home and Pro treat 0 as Required (1), so diagnostic data is reduced, not switched off.",
       "Category": "Privacy", "Risk": "Caution", "Reversible": "full", "NeedsRestart": false,
       "Editions": ["Pro","Enterprise","Education"],
       "Notes": "Pro treats AllowTelemetry 0 as Required (1). Only Enterprise and Education honour 0.",

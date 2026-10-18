@@ -86,9 +86,11 @@ function New-WfButton {
 }
 
 function ConvertTo-WfDataTable {
-    param([object[]] $Rows, [string[]] $Columns)
+    # -Headers gives readable column titles; -Columns are the property names they read.
+    param([object[]] $Rows, [string[]] $Columns, [string[]] $Headers)
+    if (-not $Headers) { $Headers = $Columns }
     $dt = New-Object System.Data.DataTable
-    foreach ($c in $Columns) { [void]$dt.Columns.Add($c) }
+    foreach ($h in $Headers) { [void]$dt.Columns.Add($h) }
     foreach ($r in @($Rows | Where-Object { $_ })) {
         $vals = foreach ($c in $Columns) { $p = $r.PSObject.Properties[$c]; if ($p -and $null -ne $p.Value) { [string]$p.Value } else { '' } }
         [void]$dt.Rows.Add([object[]]@($vals))
@@ -403,14 +405,17 @@ function Update-WfSecurity {
             SmartScreenPolicy = @('SmartScreen policy', [char]0xE8A1); SmartScreenSetting = @('SmartScreen setting', [char]0xE8A1)
             SystemDriveProtection = @('System drive encryption (BitLocker)', [char]0xE72E)
         }
+        $otherAv = @(([string](Get-TweakProperty $r.Posture 'Antivirus')) -split '; ' | Where-Object { $_ -match '=on$' -and $_ -notmatch 'Defender' } | ForEach-Object { $_ -replace '=on$', '' })
         $first = $true
         foreach ($p in $r.Posture.PSObject.Properties) {
             $l = $labels[$p.Name]; if (-not $l) { $l = @($p.Name, [char]0xE946) }
             $v = [string]$p.Value
-            $kind = if ($v -match '^Unavailable|Not configured|Not set') { 'neutral' } elseif ($v -match '^(True|On|Normal)$') { 'ok' } elseif ($v -match '^(False|Off)$|=False') { 'warn' } else { 'neutral' }
-            $tagText = if ($v.Length -gt 34) { $v.Substring(0, 31) + '...' } else { $v }
-            $tag = New-WfTag $tagText $kind; $tag.ToolTip = $v
-            [void]$c.SecurityList.Children.Add((New-WfRow -Glyph ([string]$l[1]) -Title $l[0] -Sub $v -Right @($tag) -NoTopLine:$first))
+            $verdict = Get-WfPostureVerdict -Name $p.Name -Value $v -OtherAntivirus $otherAv
+            $detail = ($v -replace '=True', ' on' -replace '=False', ' off' -replace '=on', ' on' -replace '=off', ' off' -replace '; ', "  $($script:WfDot)  ")
+            if ($v -eq 'True') { $detail = 'On' } elseif ($v -eq 'False') { $detail = 'Off' }
+            if ($verdict.Note) { $detail = "$detail $($script:WfDot) $($verdict.Note)" }
+            $tag = New-WfTag $verdict.Text $verdict.Kind
+            [void]$c.SecurityList.Children.Add((New-WfRow -Glyph ([string]$l[1]) -Title $l[0] -Sub $detail -Right @($tag) -NoTopLine:$first))
             $first = $false
         }
         $c.PrivacyNote.Text = "$($r.Honesty.Edition): $($r.Honesty.PolicyNote)"
@@ -429,12 +434,48 @@ function Update-WfSecurity {
     } | Out-Null
 }
 
+function Get-WfPostureVerdict {
+    # Short tag text for one posture value. Only restates what Windows reported; values it
+    # could not read stay neutral, never green.
+    param([string] $Name, [string] $Value, [string[]] $OtherAntivirus)
+    $v = $Value
+    if ($v -match '^Unavailable') { return @{ Text = 'Unavailable'; Kind = 'neutral'; Note = '' } }
+    switch ($Name) {
+        'DefenderRealTime' {
+            if ($v -eq 'True') { return @{ Text = 'On'; Kind = 'ok'; Note = '' } }
+            if ($OtherAntivirus) { return @{ Text = 'Off (expected)'; Kind = 'neutral'; Note = "$($OtherAntivirus -join ', ') is the active antivirus" } }
+            return @{ Text = 'Off'; Kind = 'warn'; Note = 'no other antivirus reported as active' }
+        }
+        'DefenderMode' { return @{ Text = ($v -replace ' Mode$', ''); Kind = 'neutral'; Note = '' } }
+        'TamperProtection' { if ($v -eq 'True') { return @{ Text = 'On'; Kind = 'ok'; Note = '' } } else { return @{ Text = 'Off'; Kind = 'warn'; Note = '' } } }
+        'Antivirus' {
+            $on = @($v -split '; ' | Where-Object { $_ -match '=on$' } | ForEach-Object { $_ -replace '=on$', '' })
+            if ($on) { return @{ Text = "$($on[0]) active"; Kind = 'ok'; Note = '' } }
+            return @{ Text = 'None active'; Kind = 'warn'; Note = '' }
+        }
+        'FirewallProfiles' {
+            $onCount = ([regex]::Matches($v, '=True')).Count; $all = ([regex]::Matches($v, '=')).Count
+            return @{ Text = "$onCount of $all on"; Kind = $(if ($all -and $onCount -eq $all) { 'ok' } else { 'warn' }); Note = '' }
+        }
+        'SystemDriveProtection' {
+            if ($v -eq 'On') { return @{ Text = 'Encrypted'; Kind = 'ok'; Note = '' } }
+            return @{ Text = $v; Kind = 'neutral'; Note = '' }
+        }
+        default {
+            if ($v -match '^Not ') { return @{ Text = 'Default'; Kind = 'neutral'; Note = '' } }
+            return @{ Text = $(if ($v.Length -gt 24) { $v.Substring(0, 21) + '...' } else { $v }); Kind = 'neutral'; Note = '' }
+        }
+    }
+}
+
 function Update-WfHistory {
     $c = $script:wf.C
     $hist = @(Get-WinForgeHistory -Context $script:wf.Context)
     $script:wf.History = $hist
-    $c.RunsGrid.ItemsSource = (ConvertTo-WfDataTable -Rows $hist -Columns @('RunId','StartedUtc','Profile','State','Applied','Failed','Restored')).DefaultView
-    $c.InstallsGrid.ItemsSource = (ConvertTo-WfDataTable -Rows @(Get-WinForgeInstallHistory -Context $script:wf.Context) -Columns @('InstallId','StartedUtc','Bundle','RestorePoint','Installed','Failed')).DefaultView
+    $c.RunsGrid.ItemsSource = (ConvertTo-WfDataTable -Rows $hist -Columns @('RunId','StartedUtc','Profile','State','Applied','Failed','Restored') `
+        -Headers @('Run','Started (UTC)','Profile','State','Applied','Failed','Undone')).DefaultView
+    $c.InstallsGrid.ItemsSource = (ConvertTo-WfDataTable -Rows @(Get-WinForgeInstallHistory -Context $script:wf.Context) -Columns @('InstallId','StartedUtc','Bundle','RestorePoint','Installed','Failed') `
+        -Headers @('Install','Started (UTC)','Bundle','Restore point','Installed','Failed')).DefaultView
     $c.UndoRunBtn.IsEnabled = $false
     $c.RunDetail.Text = if ($hist) { 'Select a run to see each tweak, its status and whether it was undone.' } else { 'No runs recorded yet. Runs appear here after you apply changes.' }
 
@@ -646,29 +687,84 @@ function Show-WfReview {
     $script:wf.C.SelectionLine.Text = 'Building the change plan from this PC...'
     Start-WfJob -Name 'preview' -JobArgs @{ Ids = $ids } -Script {
         $plan = Invoke-WinForgeOperation -Context $Context -TweakId $JobArgs.Ids -Preview 6>$null
-        [pscustomobject]@{
-            Lines = @(Get-OperationPlanText -Plan $plan)
-            Supported = @($plan | Where-Object Supported).Count
-            Danger = @($plan | Where-Object { $_.Supported -and $_.Risk -eq 'Danger' } | ForEach-Object Id)
-            Total = @($plan).Count
-        }
+        $cat = Get-WinForgeCatalog -Context $Context
+        # One item per tweak, with the engine's own plan lines and whether anything would change.
+        @(foreach ($p in $plan) {
+            $tw = Get-WinForgeTweak -Id $p.Id -Catalog $cat
+            [pscustomobject]@{
+                Id = $p.Id; Name = $p.Name; Risk = $p.Risk; Supported = $p.Supported; Reason = $p.Reason
+                Already = ($p.Supported -and (Test-TweakTargets -Tweak $tw))
+                Lines = @(Get-OperationPlanText -Plan @($p) | ForEach-Object { ($_ -replace "^$([regex]::Escape($p.Id))\s+", '') })
+            }
+        })
     } -OnDone {
         param($r, $sync, $a)
         Update-WfSelectionLine
+        $items = @($r)
+        $change = @($items | Where-Object { $_.Supported -and -not $_.Already })
+        $already = @($items | Where-Object { $_.Supported -and $_.Already })
+        $skip = @($items | Where-Object { -not $_.Supported })
+        $danger = @($change | Where-Object Risk -eq 'Danger')
         $elev = [bool]$script:wf.Sys.Elevated
-        $danger = @($r.Danger)
-        $ok = $r.Supported -gt 0 -and $elev -and $danger.Count -le 1
-        $extra = @()
-        if (-not $elev) { $extra += 'Applying needs administrator rights: close this window and start WinForge.bat.' }
-        if ($danger.Count -gt 1) { $extra += 'Danger tweaks must be applied one at a time. Deselect all but one.' }
-        if ($r.Supported -eq 0) { $extra += 'None of the selected tweaks can be applied on this PC.' }
-        $extra += "$($r.Supported) of $($r.Total) selected tweak$(if ($r.Total -ne 1) { 's' }) can be applied here. Every change is recorded and can be undone from History."
-        $confirm = if ($danger.Count -eq 1) { [string]$danger[0] } else { $null }
-        Show-WfDialog -Title "Change plan: current $($script:WfArrow) new" -Lines (@($r.Lines) + @('') + $extra) `
-            -PrimaryText "Apply $($r.Supported) change$(if ($r.Supported -ne 1) { 's' })" -SecondaryText 'Back' `
+        $ok = $change.Count -gt 0 -and $elev -and $danger.Count -le 1
+
+        $body = @()
+        if ($change) {
+            $body += New-WfSection "Will change ($($change.Count))"
+            foreach ($i in $change) { $body += New-WfPlanItem -Item $i -Kind $(if ($i.Risk -eq 'Danger') { 'danger' } else { 'ok' }) -TagText $(if ($i.Risk -eq 'Danger') { 'Danger' } else { 'Will change' }) }
+        }
+        if ($already) {
+            $body += New-WfSection "Already set on this PC ($($already.Count)): nothing to do"
+            $t = New-WfText -Text (($already | ForEach-Object Name) -join "  $($script:WfDot)  ") -Style 'Sub'; $t.Margin = '0,0,0,10'; $body += $t
+        }
+        if ($skip) {
+            $body += New-WfSection "Can't apply here ($($skip.Count))"
+            foreach ($i in $skip) { $body += New-WfPlanItem -Item $i -Kind 'warn' -TagText 'Skipped' -Note $i.Reason }
+        }
+        $notes = @()
+        if (-not $elev) { $notes += 'Applying needs administrator rights: close this window and start WinForge.bat.' }
+        if ($danger.Count -gt 1) { $notes += 'Danger tweaks must be applied one at a time. Deselect all but one.' }
+        if (-not $change) { $notes += 'Nothing to apply: every selected tweak is already set or not supported here.' }
+        $notes += 'Every change is recorded before it is made, and can be undone from History & rollback.'
+        $banner = New-Object Windows.Controls.Border
+        $banner.CornerRadius = 13; $banner.Padding = '12'; $banner.Margin = '0,8,0,0'; $banner.Background = ConvertTo-WfBrush '#EFE0C4'
+        $banner.Child = New-WfText -Text ($notes -join "`n") -Size 12
+        $body += $banner
+
+        $confirm = if ($danger.Count -eq 1) { [string]$danger[0].Id } else { $null }
+        Show-WfDialog -Title "Change plan: current $($script:WfArrow) new" -Lines $body `
+            -PrimaryText "Apply $($change.Count) change$(if ($change.Count -ne 1) { 's' })" -SecondaryText 'Back' `
             -PrimaryEnabled $ok -ConfirmId $confirm -DangerPrimary:([bool]$confirm) `
-            -Data @{ Ids = $a.Ids; Typed = $confirm } -OnPrimary { param($d) Start-WfApply -Ids $d.Ids -TypedConfirmation $d.Typed }
+            -Data @{ Ids = @($change | ForEach-Object Id); Typed = $confirm } -OnPrimary { param($d) Start-WfApply -Ids $d.Ids -TypedConfirmation $d.Typed }
     } | Out-Null
+}
+
+function New-WfSection {
+    param([string] $Text)
+    $t = New-WfText -Text $Text.ToUpper() -Style 'Eyebrow'
+    $t.Margin = '0,10,0,6'
+    return $t
+}
+
+function New-WfPlanItem {
+    # The design's .planitem: bold name with a tag, then the engine's current -> new lines.
+    param($Item, [string] $Kind, [string] $TagText, [string] $Note)
+    $b = New-Object Windows.Controls.Border
+    $b.BorderBrush = ConvertTo-WfBrush '#E7DECA'; $b.BorderThickness = '0,0,0,1'; $b.Padding = '0,9'
+    $sp = New-Object Windows.Controls.StackPanel
+    $head = New-Object Windows.Controls.DockPanel
+    $tag = New-WfTag $TagText $Kind
+    [Windows.Controls.DockPanel]::SetDock($tag, 'Right'); [void]$head.Children.Add($tag)
+    [void]$head.Children.Add((New-WfText -Text $Item.Name -Size 13 -Bold))
+    [void]$sp.Children.Add($head)
+    $lines = if ($Note) { @($Note) } else { @($Item.Lines) }
+    foreach ($l in $lines) {
+        $color = if ($l -match '^(DANGER|SKIP):') { '#9A4B3A' } elseif ($l -match '^(NOTE|REVERSIBLE):') { '#8A6C3F' } else { '#6F6A58' }
+        $t = New-WfText -Text $l -Mono -Color $color; $t.Margin = '0,4,0,0'
+        [void]$sp.Children.Add($t)
+    }
+    $b.Child = $sp
+    return $b
 }
 
 function Start-WfApply {
@@ -692,16 +788,36 @@ function Start-WfUndo {
     $runId = [string]@($script:wf.History)[$i].RunId
     Start-WfJob -Name 'undo preview' -JobArgs @{ RunId = $runId } -Script {
         $plan = Invoke-WinForgeUndo -Context $Context -RunId $JobArgs.RunId -Preview
-        [pscustomobject]@{ Lines = @(Get-WinForgeUndoPlanText -Plan $plan); Restorable = @($plan | Where-Object Action -eq 'Restore').Count; Count = @($plan).Count }
+        @(foreach ($p in $plan) {
+            [pscustomobject]@{ Id = $p.Id; Action = $p.Action; Reason = $p.Reason
+                Lines = @(Get-WinForgeUndoPlanText -Plan @($p) | ForEach-Object { ($_ -replace "^$([regex]::Escape($p.Id))\s+", '') }) }
+        })
     } -OnDone {
         param($r, $sync, $a)
-        if ($r.Count -eq 0) { Show-WfMessage -Title "Run $($a.RunId)" -Lines @('Nothing left to undo in this run.'); return }
+        $items = @($r)
+        if (-not $items) { Show-WfMessage -Title "Run $($a.RunId)" -Lines @('Nothing left to undo in this run.'); return }
+        $restore = @($items | Where-Object Action -eq 'Restore')
+        $other = @($items | Where-Object Action -ne 'Restore')
+        $name = { param($id) $t = $script:wf.Catalog.tweaks | Where-Object Id -eq $id; if ($t) { $t.Name } else { $id } }
+        $body = @()
+        if ($restore) {
+            $body += New-WfSection "Will restore ($($restore.Count))"
+            foreach ($i in $restore) { $body += New-WfPlanItem -Item ([pscustomobject]@{ Name = (& $name $i.Id); Lines = $i.Lines }) -Kind 'ok' -TagText 'Restore' }
+        }
+        if ($other) {
+            $body += New-WfSection "Can't restore automatically ($($other.Count))"
+            foreach ($i in $other) { $body += New-WfPlanItem -Item ([pscustomobject]@{ Name = (& $name $i.Id); Lines = @() }) -Kind 'warn' -TagText $(if ($i.Action -eq 'NotReversible') { 'Manual' } else { $i.Action }) -Note $i.Reason }
+        }
         $elev = [bool]$script:wf.Sys.Elevated
-        $lines = @($r.Lines) + @('')
-        if (-not $elev) { $lines += 'Undo needs administrator rights: close this window and start WinForge.bat.' }
-        $lines += 'After restoring, WinForge reads every value back and reports anything that does not match.'
-        Show-WfDialog -Title "Undo run $($a.RunId): current $($script:WfArrow) restored" -Lines $lines -PrimaryText "Restore $($r.Restorable)" -SecondaryText 'Back' `
-            -PrimaryEnabled ($elev -and $r.Restorable -gt 0) -Data $a.RunId -OnPrimary {
+        $notes = @()
+        if (-not $elev) { $notes += 'Undo needs administrator rights: close this window and start WinForge.bat.' }
+        $notes += 'After restoring, WinForge reads every value back and reports anything that does not match.'
+        $banner = New-Object Windows.Controls.Border
+        $banner.CornerRadius = 13; $banner.Padding = '12'; $banner.Margin = '0,8,0,0'; $banner.Background = ConvertTo-WfBrush '#EFE0C4'
+        $banner.Child = New-WfText -Text ($notes -join "`n") -Size 12
+        $body += $banner
+        Show-WfDialog -Title "Undo run: current $($script:WfArrow) restored" -Lines $body -PrimaryText "Restore $($restore.Count)" -SecondaryText 'Back' `
+            -PrimaryEnabled ($elev -and $restore.Count -gt 0) -Data $a.RunId -OnPrimary {
                 param($rid)
                 Start-WfJob -Name 'undo' -Blocking -JobArgs @{ RunId = $rid } -Script { Invoke-WinForgeUndo -Context $Context -RunId $JobArgs.RunId 6>$null } -OnDone {
                     param($res)
@@ -731,7 +847,8 @@ function Update-WfMonitor {
     } -OnDone {
         param($r, $sync, $a)
         $c = $script:wf.C
-        $c.MonitorGrid.ItemsSource = (ConvertTo-WfDataTable -Rows @($r) -Columns @('Process','PID','RemoteAddress','RemotePort','RemoteHost','Class')).DefaultView
+        $c.MonitorGrid.ItemsSource = (ConvertTo-WfDataTable -Rows @($r) -Columns @('Process','PID','RemoteAddress','RemotePort','RemoteHost','Class') `
+            -Headers @('Process','PID','Remote address','Port','Host name','Class')).DefaultView
         $by = @($r) | Group-Object Class | ForEach-Object { "$($_.Name): $($_.Count)" }
         $c.MonitorStatus.Text = "$(@($r).Count) established connections at $((Get-Date).ToString('HH:mm:ss')) $($script:WfDot) $($by -join ', ')$(if ($a.Out) { " $($script:WfDot) saved to $($a.Out)" })"
     } | Out-Null
@@ -880,6 +997,7 @@ function Show-WinForgeWpf {
                 if ((@($script:wf.Jobs).Count -gt 0) -and ((Get-Date) - $script:wfSnapStart).TotalSeconds -lt 40) { return }
                 $this.Stop()
                 if ($env:WINFORGE_UI_PAGE) { Show-WfPage $env:WINFORGE_UI_PAGE }
+                if ($env:WINFORGE_UI_DIALOG -eq 'undo' -and @($script:wf.History).Count) { $script:wf.C.RunsGrid.SelectedIndex = 0; Start-WfUndo }
                 if ($env:WINFORGE_UI_DIALOG -eq 'review') { foreach ($id in @(($script:wf.Profiles | Where-Object Id -eq 'Recommended').TweakIds)) { [void]$script:wf.Selected.Add($id) }; Show-WfReview }
                 $shot = New-Object Windows.Threading.DispatcherTimer
                 $shot.Interval = [TimeSpan]::FromMilliseconds(1500)
