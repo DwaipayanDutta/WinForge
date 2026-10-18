@@ -68,11 +68,11 @@ function New-WfRow {
     $text.VerticalAlignment = 'Center'
     [void]$text.Children.Add((New-WfText -Text $Title -Size 13 -Bold))
     if ($Sub) { $s = New-WfText -Text $Sub -Size 11 -Color '#7B8074'; $s.Margin = '0,3,0,0'; [void]$text.Children.Add($s) }
-    $right = New-Object Windows.Controls.StackPanel
-    $right.Orientation = 'Horizontal'; $right.VerticalAlignment = 'Center'
-    foreach ($r in @($Right | Where-Object { $_ })) { [void]$right.Children.Add($r) }
-    [Windows.Controls.Grid]::SetColumn($text, 1); [Windows.Controls.Grid]::SetColumn($right, 2)
-    [void]$g.Children.Add($tile); [void]$g.Children.Add($text); [void]$g.Children.Add($right)
+    $rightPanel = New-Object Windows.Controls.StackPanel
+    $rightPanel.Orientation = 'Horizontal'; $rightPanel.VerticalAlignment = 'Center'
+    foreach ($r in @($Right | Where-Object { $_ })) { [void]$rightPanel.Children.Add($r) }
+    [Windows.Controls.Grid]::SetColumn($text, 1); [Windows.Controls.Grid]::SetColumn($rightPanel, 2)
+    [void]$g.Children.Add($tile); [void]$g.Children.Add($text); [void]$g.Children.Add($rightPanel)
     $row.Child = $g
     return $row
 }
