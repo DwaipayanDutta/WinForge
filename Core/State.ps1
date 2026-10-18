@@ -53,3 +53,23 @@ function Test-TweakTargets {
     }
     return $true
 }
+
+function Test-SnapshotEquals {
+    # Read-back check after Undo: does the live state match the captured snapshot?
+    param($Target, $Expected, $Actual)
+    $e = [bool](Get-TweakProperty $Expected 'Existed'); $a = [bool](Get-TweakProperty $Actual 'Existed')
+    if ($e -ne $a) { return $false }
+    if (-not $e) { return $true }
+    switch ($Target.Type) {
+        'Registry' {
+            return ($Expected.Kind -eq $Actual.Kind -and (@($Expected.Value) -join "`n") -eq (@($Actual.Value) -join "`n"))
+        }
+        'Service' {
+            return ((ConvertTo-ServiceStartType $Expected.StartMode) -eq (ConvertTo-ServiceStartType $Actual.StartMode) -and
+                    [bool](Get-TweakProperty $Expected 'Delayed') -eq [bool](Get-TweakProperty $Actual 'Delayed'))
+        }
+        'ScheduledTask'   { return (($Expected.State -eq 'Disabled') -eq ($Actual.State -eq 'Disabled')) }
+        'OptionalFeature' { return ((ConvertTo-FeatureBaseState $Expected.State) -eq (ConvertTo-FeatureBaseState $Actual.State)) }
+        default           { return $false }
+    }
+}

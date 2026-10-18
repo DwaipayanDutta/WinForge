@@ -36,7 +36,10 @@ function Invoke-WinForgeOperation {
         # -Force means "the front end has shown the preview and the user confirmed".
         # The CLI prompts, the GUI and wizard show a Yes/No dialog, then pass -Force.
         [switch] $Force,
-        [string] $TypedConfirmation, $Context
+        [string] $TypedConfirmation, $Context,
+        # Optional synchronized hashtable; when .Cancelled becomes true the run stops at
+        # the next tweak boundary (never mid-tweak) and the rest are recorded Cancelled.
+        $CancelToken
     )
 
     Assert-WinForgeCatalog -Context $Context
@@ -61,9 +64,10 @@ function Invoke-WinForgeOperation {
 
     foreach ($t in $tweaks) {
         $entry = $plan | Where-Object { $_.Id -eq $t.Id } | Select-Object -First 1
-        $row = [pscustomobject]@{ Id = $t.Id; Status = ''; Reason = ''; Before = $null; After = $null }
+        $row = [pscustomobject]@{ Id = $t.Id; Status = ''; Reason = ''; UndoStrategy = $t.Undo.Strategy; Before = $null; After = $null; UndoStatus = $null; UndoUtc = $null }
 
-        if (-not $entry.Supported) { $row.Status = 'Skipped'; $row.Reason = $entry.Reason }
+        if ($CancelToken -and $CancelToken['Cancelled']) { $row.Status = 'Cancelled'; $row.Reason = 'Run cancelled before this tweak' }
+        elseif (-not $entry.Supported) { $row.Status = 'Skipped'; $row.Reason = $entry.Reason }
         elseif (Test-TweakTargets -Tweak $t) { $row.Status = 'AlreadyApplied'; $row.Before = $entry.Before; $row.After = $t.Targets }
         else {
             try { Assert-OperationAuthorized -Tweak $t -Expert:$Expert -TypedConfirmation $TypedConfirmation }
@@ -110,7 +114,8 @@ function Invoke-WinForgeOperation {
         $results += [pscustomobject]@{ Id = $row.Id; Status = $row.Status; Reason = $row.Reason }
     }
 
-    $record.State = 'Completed'; $record.FinishedUtc = [DateTime]::UtcNow.ToString('o')
+    $record.State = if (@($record.Tweaks | Where-Object Status -eq 'Cancelled').Count) { 'Cancelled' } else { 'Completed' }
+    $record.FinishedUtc = [DateTime]::UtcNow.ToString('o')
     Save-RunRecord -Context $Context -Record $record | Out-Null
     Write-WinForgeLog -Message "Run $($record.RunId) completed"
     return $results
