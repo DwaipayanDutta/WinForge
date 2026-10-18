@@ -148,6 +148,105 @@ Describe 'Undo' {
     }
 }
 
+Describe 'Undo preview, verification and audit' {
+    BeforeEach {
+        Initialize-WfFakeSystem
+        $ctx = New-WfTestContext -CatalogRoot $catalogDir -Elevated
+        Invoke-WinForgeOperation -Context $ctx -TweakId 'test-one' -Force | Out-Null
+        $runId = (Get-WinForgeHistory -Context $ctx).RunId
+        $global:WfRestored.Clear()
+    }
+
+    It 'previews without changing anything and shows current and restore values' {
+        $plan = Invoke-WinForgeUndo -Context $ctx -RunId $runId -Preview
+        $plan[0].Action | Should -Be 'Restore'
+        Should -Invoke Restore-TargetSnapshot -Times 0
+        (Get-WinForgeUndoPlanText -Plan $plan) -join "`n" | Should -Match 'test-one .* -> restore \(not present\)'
+    }
+    It 'reports RestoreUnverified when the read-back does not match the snapshot' {
+        Mock Get-TargetSnapshot { [pscustomobject]@{ Existed = $true; KeyExisted = $true; Kind = 'DWord'; Value = 1 } }
+        $r = Invoke-WinForgeUndo -Context $ctx -RunId $runId
+        $r[0].Status | Should -Be 'RestoreUnverified'
+        $r[0].Reason | Should -Match 'expected \(not present\)'
+    }
+    It 'keeps the original Status and records the undo outcome next to it' {
+        Invoke-WinForgeUndo -Context $ctx -RunId $runId | Out-Null
+        $rec = Get-RunRecord -Context $ctx -RunId $runId
+        $e = @($rec.Tweaks)[0]
+        $e.Status | Should -Be 'AppliedVerified'
+        $e.UndoStatus | Should -Be 'Restored'
+        $e.UndoUtc | Should -Not -BeNullOrEmpty
+        @($rec.Undo).Count | Should -Be 1
+        @($rec.Undo)[0].User | Should -Not -BeNullOrEmpty
+    }
+    It 'still treats records written by the old format (Status=Restored) as undone' {
+        $path = Join-Path $ctx.RunDir "$runId.json"
+        $rec = Get-Content $path -Raw | ConvertFrom-Json
+        @($rec.Tweaks)[0].Status = 'Restored'
+        $rec | ConvertTo-Json -Depth 12 | Set-Content $path
+        @(Invoke-WinForgeUndo -Context $ctx -RunId $runId -Preview) | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Undo when the catalog is broken' {
+    BeforeEach {
+        Initialize-WfFakeSystem
+        $ctx = New-WfTestContext -CatalogRoot $catalogDir -Elevated
+        Invoke-WinForgeOperation -Context $ctx -TweakId 'test-one' -Force | Out-Null
+        $runId = (Get-WinForgeHistory -Context $ctx).RunId
+        $global:WfRestored.Clear()
+        $bad = New-WfTestTweak -Id 'test-bad'; $bad.Script = 'calc.exe'
+        $ctx.CatalogRoot = New-WfTestCatalog -Tweaks @($one, $bad)
+    }
+
+    It 'restores from the run record when the state folder is protected' {
+        $ctx.StateProtected = $true
+        $r = Invoke-WinForgeUndo -Context $ctx -RunId $runId
+        $r[0].Status | Should -Be 'Restored'
+        $r[0].Reason | Should -Match 'source: run record'
+        $global:WfRestored | Should -Be @('C')
+    }
+    It 'restores from the run record with -AllowRecordedTargets' {
+        (Invoke-WinForgeUndo -Context $ctx -RunId $runId -AllowRecordedTargets)[0].Status | Should -Be 'Restored'
+    }
+    It 'refuses without either, and changes nothing' {
+        $r = Invoke-WinForgeUndo -Context $ctx -RunId $runId
+        $r[0].Status | Should -Be 'Refused'
+        $r[0].Reason | Should -Match 'AllowRecordedTargets'
+        $global:WfRestored.Count | Should -Be 0
+    }
+    It 'still validates recorded targets: a tampered record is refused even when trusted' {
+        $path = Join-Path $ctx.RunDir "$runId.json"
+        $rec = Get-Content $path -Raw | ConvertFrom-Json
+        @($rec.Tweaks)[0].After[0].Path = 'SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\sethc.exe'
+        @($rec.Tweaks)[0].After[0].Name = 'Debugger'
+        $rec | ConvertTo-Json -Depth 12 | Set-Content $path
+        $r = Invoke-WinForgeUndo -Context $ctx -RunId $runId -AllowRecordedTargets
+        $r[0].Status | Should -Be 'Refused'
+        $r[0].Reason | Should -Match 'not allowed'
+        $global:WfRestored.Count | Should -Be 0
+    }
+}
+
+Describe 'Cancellation and progress' {
+    BeforeEach { Initialize-WfFakeSystem; $ctx = New-WfTestContext -CatalogRoot $catalogDir -Elevated }
+
+    It 'stops at the next tweak boundary and records the rest as Cancelled' {
+        $token = [hashtable]::Synchronized(@{ Cancelled = $false; Progress = 0 })
+        Mock Invoke-TargetApply { $global:WfFake[$Target.Name] = $true; $token.Cancelled = $true }
+        $r = Invoke-WinForgeOperation -Context $ctx -TweakId 'test-one','test-two' -Force -CancelToken $token
+        $r[0].Status | Should -Be 'AppliedVerified'
+        $r[1].Status | Should -Be 'Cancelled'
+        (Get-WinForgeHistory -Context $ctx).State | Should -Be 'Cancelled'
+        Should -Invoke Invoke-TargetApply -Times 1 -Exactly
+    }
+    It 'reports progress through the token' {
+        $token = [hashtable]::Synchronized(@{ Cancelled = $false; Progress = 0 })
+        Invoke-WinForgeOperation -Context $ctx -TweakId 'test-one','test-two' -Force -CancelToken $token | Out-Null
+        $token.Progress | Should -Be 1
+    }
+}
+
 Describe 'History' {
     It 'counts a single matching entry under strict mode' {
         $ctx = New-WfTestContext

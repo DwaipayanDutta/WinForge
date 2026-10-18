@@ -59,6 +59,24 @@ Describe 'Update check' {
         { Invoke-WinForgeUpdateCheck -Context $ctx -Download } | Should -Throw '*Hash mismatch*'
         Test-Path (Join-Path $ctx.StateRoot 'updates\WinForge-9.9.9.zip') | Should -BeFalse
     }
+    It 'downloads to the user profile when the state folder is not writable' {
+        $ctx = New-WfTestContext
+        $ctx.StateWritable = $false
+        $saved = $env:LOCALAPPDATA
+        try {
+            $env:LOCALAPPDATA = Join-Path $TestDrive 'lad'
+            Mock Get-WinForgeLatestRelease { [pscustomobject]@{ Tag = 'v9.9.9'; Published = 'x'; Assets = @(
+                [pscustomobject]@{ Name = 'WinForge-9.9.9.zip'; Url = 'https://github.com/DwaipayanDutta/WinForge/releases/download/v9.9.9/WinForge-9.9.9.zip' }
+                [pscustomobject]@{ Name = 'SHA256SUMS.txt'; Url = 'https://github.com/DwaipayanDutta/WinForge/releases/download/v9.9.9/SHA256SUMS.txt' }) } }
+            Mock Invoke-WebRequest {
+                if ($OutFile -like '*.zip') { 'payload' | Set-Content $OutFile }
+                else { "$((Get-FileHash (Join-Path (Split-Path $OutFile) 'WinForge-9.9.9.zip')).Hash)  WinForge-9.9.9.zip" | Set-Content $OutFile }
+            }
+            $r = Invoke-WinForgeUpdateCheck -Context $ctx -Download
+            $r.Verified | Should -BeTrue
+            $r.Zip | Should -BeLike "$env:LOCALAPPDATA\WinForge\updates\*"
+        } finally { $env:LOCALAPPDATA = $saved }
+    }
     It 'reports whether the release is newer without downloading' {
         $ctx = New-WfTestContext
         Mock Get-WinForgeLatestRelease { [pscustomobject]@{ Tag = 'v9.9.9'; Published = 'x'; Assets = @(

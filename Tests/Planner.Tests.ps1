@@ -25,6 +25,22 @@ Describe 'Plan text (regression: preview crashed on non-registry targets under s
     }
 }
 
+Describe 'Reversibility caveats' {
+    It 'tells the user an Appx removal is per-user and needs a Store reinstall' {
+        $plan = @([pscustomobject]@{ Id = 'debloat-remove-maps'; Risk = 'Safe'; Supported = $true; Notes = $null; Reversible = 'partial'; UndoStrategy = 'ReinstallAppx'
+            Before = @([pscustomobject]@{ Existed = $true }); After = @([pscustomobject]@{ Type = 'Appx'; Name = 'Microsoft.WindowsMaps' }) })
+        $text = (Get-OperationPlanText -Plan $plan) -join "`n"
+        $text | Should -Match 'REVERSIBLE: partial'
+        $text | Should -Match 'Microsoft Store'
+        $text | Should -Match 'current user only'
+    }
+    It 'adds nothing for fully reversible tweaks' {
+        $plan = @([pscustomobject]@{ Id = 'r'; Risk = 'Safe'; Supported = $true; Notes = $null; Reversible = 'full'; UndoStrategy = 'RestoreCapturedState'
+            Before = @([pscustomobject]@{ Existed = $false }); After = @([pscustomobject]@{ Type = 'Registry'; Kind = 'DWord'; Value = 0 }) })
+        (Get-OperationPlanText -Plan $plan) -join "`n" | Should -Not -Match 'REVERSIBLE'
+    }
+}
+
 Describe 'Plan compatibility' {
     It 'marks a tweak unsupported when its service does not exist' {
         Mock Get-TargetSnapshot { [pscustomobject]@{ Existed = $false; StartMode = $null; Delayed = $false } }

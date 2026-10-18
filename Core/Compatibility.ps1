@@ -50,6 +50,7 @@ function Get-WinForgeSystemInfo {
 
 function Get-TweakProperty {
     param($Object, [string] $Name)
+    if ($null -eq $Object) { return $null }
     $p = $Object.PSObject.Properties[$Name]
     if ($p) { return $p.Value }
     return $null

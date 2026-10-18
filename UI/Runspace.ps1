@@ -27,7 +27,7 @@ function New-WinForgeApplyRunspace {
             Initialize-WinForgeLog -Context $Context
             $sync.Log.Add('Starting apply...') | Out-Null
             # The GUI showed the plan and the user clicked Yes before this runspace started.
-            $r = Invoke-WinForgeOperation -Context $Context -TweakId $TweakId -Profile $ProfileName -Expert:$Expert -TypedConfirmation $TypedConfirmation -Force
+            $r = Invoke-WinForgeOperation -Context $Context -TweakId $TweakId -Profile $ProfileName -Expert:$Expert -TypedConfirmation $TypedConfirmation -Force -CancelToken $sync
             $sync.Progress = $sync.Total
             $sync.Result = $r
         } catch {

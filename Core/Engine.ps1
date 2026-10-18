@@ -62,7 +62,10 @@ function Invoke-WinForgeOperation {
     Write-WinForgeLog -Message "Run $($record.RunId) started ($(@($tweaks).Count) tweak(s))"
     $results = @()
 
+    $done = 0
     foreach ($t in $tweaks) {
+        if ($CancelToken) { $CancelToken['Progress'] = $done }
+        $done++
         $entry = $plan | Where-Object { $_.Id -eq $t.Id } | Select-Object -First 1
         $row = [pscustomobject]@{ Id = $t.Id; Status = ''; Reason = ''; UndoStrategy = $t.Undo.Strategy; Before = $null; After = $null; UndoStatus = $null; UndoUtc = $null }
 

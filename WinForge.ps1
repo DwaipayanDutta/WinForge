@@ -47,7 +47,16 @@ param(
     [switch]   $Expert,
     [switch]   $Force,
     [string]   $TypedConfirmation,
-    [string]   $StateRoot
+    [string]   $StateRoot,
+    # Undo: use the targets recorded at apply time when the catalog cannot confirm them.
+    [switch]   $AllowRecordedTargets,
+    # Monitor: reverse-DNS each remote address (network lookups) to classify it.
+    [switch]   $ResolveNames,
+    # Monitor: compare two exported snapshots: -Compare before.json,after.json
+    [string[]] $Compare,
+    # Install: retry with Chocolatey when winget fails; skip the System Restore point.
+    [switch]   $AllowChocoFallback,
+    [switch]   $NoRestorePoint
 )
 
 Set-StrictMode -Version Latest
@@ -55,6 +64,7 @@ $ErrorActionPreference = 'Stop'
 
 # powershell -File (used by WinForge.bat) passes "-Tweak a,b" as one string; split it.
 if ($Tweak) { $Tweak = @($Tweak | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
+if ($Compare) { $Compare = @($Compare | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ }) }
 
 $script:Root = $PSScriptRoot
 foreach ($f in @(
@@ -88,7 +98,16 @@ switch ($Command) {
     'Status'    { Show-WinForgeStatus -Context $ctx -TweakId $Tweak -Profile $ProfileName }
     'List'      { Show-WinForgeTweakList -Context $ctx | Format-Table -AutoSize }
     'Privacy'   { Show-WinForgePrivacySummary -Context $ctx }
-    'Monitor'   { Get-WinForgeConnectionSnapshot | Format-Table -AutoSize }
+    'Monitor'   {
+        if ($Compare) {
+            if (@($Compare).Count -ne 2) { throw 'Use -Compare before.json,after.json' }
+            Compare-WinForgeConnectionSnapshots -Before $Compare[0] -After $Compare[1] | Format-Table -AutoSize
+        } elseif ($OutFile) {
+            Write-Host "Snapshot saved: $(Export-WinForgeConnectionSnapshot -Context $ctx -OutFile $OutFile -ResolveNames:$ResolveNames)"
+        } else {
+            Get-WinForgeConnectionSnapshot -ResolveNames:$ResolveNames -EstablishedOnly | Format-Table Process, PID, RemoteAddress, RemotePort, RemoteHost, Class -AutoSize
+        }
+    }
     'Audit'     { Show-WinForgeSecurityAudit }
     'Preview'   {
         Invoke-WinForgeOperation -Context $ctx -TweakId $Tweak -Profile $ProfileName -Preview |
@@ -105,18 +124,27 @@ switch ($Command) {
     }
     'Undo'      {
         if (-not $RunId) { throw 'Use -RunId <id>. See: .\WinForge.ps1 History' }
-        $rec = Get-RunRecord -Context $ctx -RunId $RunId
-        @($rec.Tweaks) | Where-Object { -not $Tweak -or $Tweak -contains $_.Id } | Select-Object Id, Status | Format-Table -AutoSize
-        if (-not (Confirm-WinForgeAction "Restore the captured state for run $RunId?")) { Write-Host 'Cancelled. Nothing was changed.'; exit 2 }
-        $res = Invoke-WinForgeUndo -Context $ctx -RunId $RunId -TweakId $Tweak
+        if (-not $ctx.Elevated) { throw 'Administrator privileges are required to undo changes. Run WinForge.bat.' }
+        # Preview first: the live state next to the state that will be restored.
+        $plan = Invoke-WinForgeUndo -Context $ctx -RunId $RunId -TweakId $Tweak -AllowRecordedTargets:$AllowRecordedTargets -Preview
+        if (-not $plan) { Write-Host "Nothing left to undo in run $RunId."; exit 0 }
+        Get-WinForgeUndoPlanText -Plan $plan | ForEach-Object { Write-Host $_ }
+        if (-not @($plan | Where-Object Action -eq 'Restore')) { Write-Host 'Nothing in this run can be restored automatically.'; exit 1 }
+        if (-not (Confirm-WinForgeAction "Restore the state shown above for run $RunId?")) { Write-Host 'Cancelled. Nothing was changed.'; exit 2 }
+        $res = Invoke-WinForgeUndo -Context $ctx -RunId $RunId -TweakId $Tweak -AllowRecordedTargets:$AllowRecordedTargets
         $res | Format-Table -AutoSize
-        if (@($res | Where-Object { $_.Status -in @('Failed','Refused') })) { exit 1 }
+        if (@($res | Where-Object { $_.Status -in @('Failed','Refused','RestoreUnverified') })) { exit 1 }
     }
-    'History'   { Get-WinForgeHistory -Context $ctx | Format-Table -AutoSize }
+    'History'   {
+        Write-Host 'Tweak runs' -ForegroundColor Cyan
+        Get-WinForgeHistory -Context $ctx | Format-Table -AutoSize
+        Write-Host 'App installs' -ForegroundColor Cyan
+        Get-WinForgeInstallHistory -Context $ctx | Format-Table -AutoSize
+    }
     'Install'   {
         $bundleId = if ($Bundle) { $Bundle } else { 'Essentials' }
         if (-not $Force) { Write-Host 'Dry run. Add -Force to install.' -ForegroundColor Yellow }
-        $res = Install-WinForgeBundle -Context $ctx -BundleId $bundleId -DryRun:(-not $Force)
+        $res = Install-WinForgeBundle -Context $ctx -BundleId $bundleId -DryRun:(-not $Force) -AllowChocoFallback:$AllowChocoFallback -NoRestorePoint:$NoRestorePoint
         $res | Format-Table -AutoSize
         if (@($res | Where-Object { $_.Status -in @('Failed','NoProvider','InstalledUnverified') })) { exit 1 }
     }
@@ -130,7 +158,12 @@ switch ($Command) {
         Add-Type -AssemblyName System.Windows.Forms, System.Drawing, Microsoft.VisualBasic
         . (Join-Path $Root 'UI\Runspace.ps1')
         . (Join-Path $Root 'UI\MainForm.ps1')
-        Show-WinForgeMainForm -Context $ctx
+        # Usually started by double-click, where a console error may never be seen.
+        try { Show-WinForgeMainForm -Context $ctx }
+        catch {
+            [void][System.Windows.Forms.MessageBox]::Show("WinForge could not start the GUI:`r`n`r`n$($_.Exception.Message)", 'WinForge', 'OK', 'Error')
+            throw
+        }
     }
     'Wizard'    {
         Add-Type -AssemblyName Microsoft.VisualBasic, System.Windows.Forms

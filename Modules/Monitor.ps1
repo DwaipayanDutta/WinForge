@@ -80,8 +80,10 @@ function Compare-WinForgeConnectionSnapshots {
     # Compares by remote endpoint and process. Ephemeral local ports are ignored, so a
     # reconnect to the same endpoint is not reported as a change.
     param([string] $Before, [string] $After)
-    $b = @(Get-Content -LiteralPath $Before -Raw | ConvertFrom-Json)
-    $a = @(Get-Content -LiteralPath $After  -Raw | ConvertFrom-Json)
+    # Windows PowerShell's ConvertFrom-Json emits a JSON array as one object; the extra
+    # pipeline stage enumerates it into its elements.
+    $b = @((Get-Content -LiteralPath $Before -Raw | ConvertFrom-Json) | ForEach-Object { $_ })
+    $a = @((Get-Content -LiteralPath $After  -Raw | ConvertFrom-Json) | ForEach-Object { $_ })
     $key = { param($x) "$($x.Process) -> $($x.RemoteAddress):$($x.RemotePort)" }
     $bSet = @{}; $aSet = @{}
     foreach ($x in $b) { $bSet[(& $key $x)] = $x }

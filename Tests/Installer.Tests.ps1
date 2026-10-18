@@ -39,6 +39,35 @@ Describe 'Installer' {
         $r = Install-WinForgeBundle -Context $ctx -BundleId 'Gaming' -AllowChocoFallback
         @($r | Where-Object { $_.Provider -ne 'choco' -or $_.Status -ne 'InstalledVerified' }) | Should -BeNullOrEmpty
     }
+    It 'creates a restore point before a real install and records the run' {
+        $ictx = New-WfTestContext -Elevated
+        Mock Get-WinForgeProviders { [pscustomobject]@{ winget = 'v1.9'; choco = $null } }
+        Mock Install-WinForgeApp { [pscustomobject]@{ Id = $App.Id; Status = 'InstalledVerified'; Provider = $Provider; Reason = '' } }
+        Mock Checkpoint-Computer {}
+        Install-WinForgeBundle -Context $ictx -BundleId 'Gaming' | Out-Null
+        Should -Invoke Checkpoint-Computer -Times 1
+        $h = Get-WinForgeInstallHistory -Context $ictx
+        $h.Bundle | Should -Be 'Gaming'
+        $h.RestorePoint | Should -Be 'Created'
+        $h.Installed | Should -Be 3
+    }
+    It 'records a failed restore point instead of aborting' {
+        $ictx = New-WfTestContext -Elevated
+        Mock Get-WinForgeProviders { [pscustomobject]@{ winget = 'v1.9'; choco = $null } }
+        Mock Install-WinForgeApp { [pscustomobject]@{ Id = $App.Id; Status = 'InstalledVerified'; Provider = $Provider; Reason = '' } }
+        Mock Checkpoint-Computer { throw 'System Restore is turned off' }
+        Install-WinForgeBundle -Context $ictx -BundleId 'Gaming' | Out-Null
+        (Get-WinForgeInstallHistory -Context $ictx).RestorePoint | Should -Match 'Not created: System Restore is turned off'
+    }
+    It 'takes no restore point and writes no history in a dry run' {
+        $ictx = New-WfTestContext -Elevated
+        Mock Get-WinForgeProviders { [pscustomobject]@{ winget = 'v1.9'; choco = $null } }
+        Mock Install-WinForgeApp { [pscustomobject]@{ Id = $App.Id; Status = 'WouldInstall'; Provider = $Provider; Reason = '' } }
+        Mock Checkpoint-Computer {}
+        Install-WinForgeBundle -Context $ictx -BundleId 'Gaming' -DryRun | Out-Null
+        Should -Invoke Checkpoint-Computer -Times 0
+        @(Get-WinForgeInstallHistory -Context $ictx) | Should -BeNullOrEmpty
+    }
     It 'does not fall back unless asked' {
         Mock Get-WinForgeProviders { [pscustomobject]@{ winget = 'v1.9'; choco = '2.3.0' } }
         Mock Install-WinForgeApp { [pscustomobject]@{ Id = $App.Id; Status = 'Failed'; Provider = $Provider; Reason = '' } }

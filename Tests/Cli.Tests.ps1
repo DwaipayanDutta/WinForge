@@ -27,6 +27,29 @@ Describe 'Static checks' {
     }
 }
 
+Describe 'GUI robustness (static)' {
+    BeforeAll {
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path (Split-Path -Parent $PSScriptRoot) 'UI\MainForm.ps1'), [ref]$null, [ref]$null)
+        $handlers = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and $n.Member.Value -like 'Add_*' }, $true)
+    }
+    It 'wraps every click, tick and selection handler in Invoke-WinForgeUiAction' {
+        $handlers.Count | Should -BeGreaterThan 5
+        foreach ($h in $handlers | Where-Object { $_.Member.Value -in 'Add_Click','Add_Tick','Add_SelectedIndexChanged' }) {
+            $h.Arguments[0].Extent.Text | Should -Match '^\{\s*Invoke-WinForgeUiAction' -Because $h.Extent.Text.Substring(0, [Math]::Min(80, $h.Extent.Text.Length))
+        }
+    }
+    It 'handlers reach controls only through $script:wfUi, not function locals' {
+        $locals = 'progress','applyBtn','cancelBtn','expertChk','list','grid','details','catalog','sys'
+        foreach ($h in $handlers) {
+            $vars = $h.Arguments[0].FindAll({ param($n) $n -is [System.Management.Automation.Language.VariableExpressionAst] }, $true) | ForEach-Object { $_.VariablePath.UserPath }
+            @($vars | Where-Object { $locals -contains $_ }) | Should -BeNullOrEmpty -Because $h.Member.Value
+        }
+    }
+    It 'has a Cancel button wired to the run' {
+        (Get-Content (Join-Path (Split-Path -Parent $PSScriptRoot) 'UI\MainForm.ps1') -Raw) | Should -Match 'Runner\.Sync\.Cancelled = \$true'
+    }
+}
+
 Describe 'Launcher' {
     BeforeAll { $bat = Join-Path (Split-Path -Parent $PSScriptRoot) 'WinForge.bat' }
     It 'uses CRLF line endings (cmd.exe misparses LF batch files)' {
@@ -34,10 +57,20 @@ Describe 'Launcher' {
         [regex]::Matches($raw, "(?<!`r)`n").Count | Should -Be 0
     }
     It 'opens the GUI when started without arguments (double-click)' {
-        (Get-Content $bat -Raw) | Should -Match 'WinForge\.ps1" Gui'
+        (Get-Content $bat -Raw) | Should -Match 'WF_PS1%" Gui'
     }
     It 'keeps the elevated window open for CLI commands' {
-        (Get-Content $bat -Raw) | Should -Match "cmd\.exe -ArgumentList \('/k "
+        (Get-Content $bat -Raw) | Should -Match "-NoExit -File "
+    }
+    It 'checks elevation with fltmc, not net session (no relaunch loop when the Server service is off)' {
+        $code = (Get-Content $bat) | Where-Object { $_ -notmatch '^\s*rem ' }
+        ($code -join "`n") | Should -Match '(?m)^fltmc >nul' -Because 'fltmc works without LanmanServer'
+        ($code -join "`n") | Should -Not -Match 'net session'
+    }
+    It 'elevates powershell.exe -File directly, never cmd.exe or the .bat itself' {
+        $code = ((Get-Content $bat) | Where-Object { $_ -notmatch '^\s*rem ' }) -join "`n"
+        $code | Should -Not -Match 'cmd\.exe|/k |WF_SELF'
+        $code | Should -Match "Start-Process -FilePath powershell\.exe -ArgumentList \`$argList -Verb RunAs"
     }
     It 'shows the script help, not just the syntax line' {
         (Get-Help (Join-Path (Split-Path -Parent $PSScriptRoot) 'WinForge.ps1')).Synopsis | Should -Match 'preview-first'
