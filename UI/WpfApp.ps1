@@ -472,11 +472,12 @@ function Update-WfDashboardStatic {
     $c.ElevationBanner.Visibility = if ($sys.Elevated) { 'Collapsed' } else { 'Visible' }
 
     $c.InsightsList.Children.Clear()
+    # Leading commas keep each row an array; without them @() flattens the rows together.
     $rows = @(
-        @([char]0xE770, 'Windows', "Build $($sys.Build) $($script:WfDot) $($sys.Edition) ($($sys.EditionId)) $($script:WfDot) $($sys.Arch)")
-        @([char]0xE7EF, 'Rights', $(if ($sys.Elevated) { 'Running as administrator' } else { 'Not elevated: preview and read-only views only' }))
-        @([char]0xE968, 'Management', $(if ($sys.Managed) { "Managed ($($sys.ManagedReason)): only Safe tweaks will apply" } else { 'Not domain-joined or MDM-enrolled' }))
-        @([char]0xE8B7, 'State folder', "$($script:wf.Context.StateRoot)$(if (Get-TweakProperty $script:wf.Context 'StateProtected') { ' (admin-only)' })")
+        ,@([char]0xE770, 'Windows', "Build $($sys.Build) $($script:WfDot) $($sys.Edition) ($($sys.EditionId)) $($script:WfDot) $($sys.Arch)")
+        ,@([char]0xE7EF, 'Rights', $(if ($sys.Elevated) { 'Running as administrator' } else { 'Not elevated: preview and read-only views only' }))
+        ,@([char]0xE968, 'Management', $(if ($sys.Managed) { "Managed ($($sys.ManagedReason)): only Safe tweaks will apply" } else { 'Not domain-joined or MDM-enrolled' }))
+        ,@([char]0xE8B7, 'State folder', "$($script:wf.Context.StateRoot)$(if (Get-TweakProperty $script:wf.Context 'StateProtected') { ' (admin-only)' })")
     )
     $first = $true
     foreach ($r in $rows) { [void]$c.InsightsList.Children.Add((New-WfRow -Glyph ([string]$r[0]) -Title $r[1] -Sub $r[2] -NoTopLine:$first)); $first = $false }
